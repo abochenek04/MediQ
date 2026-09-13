@@ -1,4 +1,4 @@
-# MediQ
+# MediQ - Sol
 
 **Know before you go.**
 
