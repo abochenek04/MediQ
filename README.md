@@ -220,3 +220,17 @@ Deploy `dist/` to a static host.
 ## Prototype disclaimer
 
 Wait estimates are planning information, not medical advice or guarantees. If you believe you are experiencing a medical emergency, contact emergency services.
+
+## Second-generation prototype refinement
+
+The existing architecture and routes are retained. `/saved` is now labeled **Appointments**, `/know` is now **About**, and `/contact` adds a local demo contact form.
+
+Find Care includes language and minimum clinic-rating filters, shared typed service filtering, a current/recent report dialog, and optional browser geolocation. Ratings are derived from fictional clinic reviews with explicit source metadata; location only changes straight-line distances to fictional Durham fixtures. Manual search remains available. Morning/afternoon selections prioritize historical duration when using the default sort.
+
+Visit visualizations consistently use **Check in → Wait → Care → Check out**, preserving existing durations. The global AppContext translation system now covers the main workflows in English, Spanish, Chinese, and Arabic, including RTL layout. The skippable interface tour can be replayed from the footer. Completion is stored under `mediq-tour-v1`.
+
+Quick and full reports share draft creation, validation, AppContext submission, and ClinicDataService. Ongoing reports have `reportKind: 'current-wait'` and `elapsedMinutes`; their `totalMinutes` is zero because the full visit is not complete. Future estimate adapters must treat these separately. Exact reports retain their date and timing fields.
+
+`npm test` builds the application and tests routes/assets, fixture integrity, old and new filters, historical sort, location permission adapter outcomes, rounded distance calculations, report validation/submission, visit-plan arithmetic, and translation catalog completeness. Browser interaction checks are documented in `docs/verification.md`. Background product and integration notes are retained in `docs/product-background.md`.
+
+If an existing checked-in Vite dependency cache causes a duplicate React runtime during development, restart with `npm run dev -- --force`.

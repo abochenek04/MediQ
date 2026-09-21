@@ -14,24 +14,18 @@ import {
   Timer,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ClinicCard, MapView } from '../components/ClinicComponents';
 import { DemoBadge, InfoNote, PageLoader, SafetyNote } from '../components/UI';
 import { useApp } from '../context/AppContext';
-import { insurancePlans, specialtyOptions } from '../data/mockData';
-import { clinicService } from '../services/clinicService';
+import { clinicLanguageOptions, insurancePlans, specialtyOptions } from '../data/mockData';
+import { requestApproximateLocation } from '../services/locationService';
+import { clinicService, defaultSearchFilters } from '../services/clinicService';
 import type { Clinic, SearchFilters, VisitMode } from '../types';
 import { Link, navigate } from '../utils/navigation';
 import { formatDateTime, formatTime, getVisitPlan } from '../utils/time';
 
-const defaultFilters: SearchFilters = {
-  query: '',
-  insurance: '',
-  specialty: '',
-  visitMode: 'all',
-  timing: 'all',
-  maxDistance: 10,
-};
+const defaultFilters = defaultSearchFilters;
 
 type ViewMode = 'list' | 'map';
 type SortMode = 'distance' | 'shortest' | 'reliability';
@@ -48,18 +42,24 @@ export function FindCarePage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedClinicId, setSelectedClinicId] = useState('');
   const [upcomingClinic, setUpcomingClinic] = useState<Clinic | undefined>();
+  const [locationBusy, setLocationBusy] = useState(false);
+  const [locationMessage, setLocationMessage] = useState('Demo distances from downtown Durham.');
+  const requestId = useRef(0);
+  const locationRequestId = useRef(0);
+  useEffect(() => () => { requestId.current++; locationRequestId.current++; }, []);
   const upcoming = savedAppointments[0];
 
   const loadResults = async () => {
+    const id = ++requestId.current;
     setLoading(true);
     setError(false);
     try {
       const data = await clinicService.searchClinics(filters);
-      setResults(data);
+      if (id === requestId.current) setResults(data);
     } catch {
-      setError(true);
+      if (id === requestId.current) setError(true);
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
   };
 
@@ -84,15 +84,17 @@ export function FindCarePage() {
   const sortedResults = useMemo(() => {
     const copy = [...results];
     if (sort === 'shortest') {
-      return copy.sort((a, b) => a.estimates[0].totalMinutes - b.estimates[0].totalMinutes);
+      return copy.sort((a, b) => (a.estimates.find(e => e.mode === filters.visitMode) || a.estimates[0]).totalMinutes - (b.estimates.find(e => e.mode === filters.visitMode) || b.estimates[0]).totalMinutes);
     }
     if (sort === 'reliability') {
       return copy.sort((a, b) => b.reliability.score - a.reliability.score);
     }
-    return copy.sort((a, b) => a.distanceMiles - b.distanceMiles);
-  }, [results, sort]);
+    return filters.timing === 'morning' || filters.timing === 'afternoon' ? copy : copy.sort((a, b) => a.distanceMiles - b.distanceMiles);
+  }, [results, sort, filters.timing, filters.visitMode]);
 
   const activeFilterCount = [
+    filters.language,
+    filters.minimumRating,
     filters.insurance,
     filters.specialty,
     filters.visitMode !== 'all' ? filters.visitMode : '',
@@ -115,16 +117,29 @@ export function FindCarePage() {
     if (key === 'walk-in') updateFilter('visitMode', filters.visitMode === 'walk-in' ? 'all' : 'walk-in');
     if (key === 'scheduled') updateFilter('visitMode', filters.visitMode === 'scheduled' ? 'all' : 'scheduled');
     if (key === 'open') updateFilter('timing', filters.timing === 'open-now' ? 'all' : 'open-now');
-    if (key === 'pediatrics') updateFilter('specialty', filters.specialty === 'Pediatrics' ? '' : 'Pediatrics');
+    if (key === 'pediatrics') updateFilter('specialty', filters.specialty === 'Pediatrics' ? '' : t("Pediatrics"));
     if (key === 'medicaid') updateFilter('insurance', filters.insurance === 'Medicaid' ? '' : 'Medicaid');
   };
 
   const useLocation = () => {
-    pushToast('Using a simulated downtown Durham location for this prototype.', 'info');
+    if (!navigator.geolocation) { setLocationMessage('Location is unavailable. You can keep searching manually.'); return; }
+    const id = ++locationRequestId.current;
+    setLocationBusy(true);
+    setLocationMessage('Your browser will ask for permission. Location is optional.');
+    void requestApproximateLocation(navigator.geolocation).then(origin => {
+      if (id !== locationRequestId.current) return;
+      setFilters(current => ({ ...current, origin }));
+      setLocationBusy(false);
+      setLocationMessage('Approximate distance to fictional Durham clinics. No live nearby-care data.');
+    }, () => {
+      if (id !== locationRequestId.current) return;
+      setLocationBusy(false);
+      setLocationMessage('Location was not available. You can keep searching manually.');
+    });
   };
 
   const clearFilters = () => {
-    setFilters({ ...defaultFilters, query: filters.query });
+    setFilters({ ...defaultFilters, query: filters.query, origin: filters.origin });
   };
 
   const upcomingPlan = upcoming && upcomingClinic ? getVisitPlan(upcoming, upcomingClinic) : null;
@@ -136,14 +151,14 @@ export function FindCarePage() {
         <div className="hero-orbit orbit-two" aria-hidden="true" />
         <div className="shell find-hero-inner">
           <div className="find-hero-copy">
-            <DemoBadge label="Durham demo · fictional data" />
+            <DemoBadge label={t("Durham demo · fictional data")} />
             <span className="eyebrow light">{t('heroEyebrow')}</span>
             <h1>{t('heroTitle')}</h1>
             <p>{t('heroBody')}</p>
           </div>
 
           <form className="care-search" onSubmit={runSearch} role="search">
-            <label htmlFor="care-search-input">Search for care</label>
+            <label htmlFor="care-search-input">{t("Search for care")}</label>
             <div className="care-search-row">
               <Search aria-hidden="true" />
               <input
@@ -153,25 +168,26 @@ export function FindCarePage() {
                 placeholder={t('searchPlaceholder')}
               />
               {filters.query && (
-                <button className="clear-search" type="button" onClick={() => updateFilter('query', '')} aria-label="Clear search">
+                <button className="clear-search" type="button" onClick={() => updateFilter('query', '')} aria-label={t("Clear search")}>
                   <X aria-hidden="true" />
                 </button>
               )}
-              <button className="button button-coral" type="submit">Search <ArrowRight aria-hidden="true" /></button>
+              <button className="button button-coral" type="submit">{t("Search")} <ArrowRight aria-hidden="true" /></button>
             </div>
             <div className="search-location">
-              <span><MapPin aria-hidden="true" /> Near Durham, North Carolina</span>
-              <button type="button" onClick={useLocation}><LocateFixed aria-hidden="true" /> Use my location</button>
+              <span><MapPin aria-hidden="true" /> {t(filters.origin ? t("Approximate location · fictional clinics") : t("Near Durham, North Carolina"))}</span>
+              <button type="button" disabled={locationBusy} onClick={useLocation}><LocateFixed aria-hidden="true" /> {t(locationBusy ? t("Locating…") : t("Use my location"))}</button>
             </div>
+            <p className="location-status" role="status">{t(locationMessage)} {filters.origin && <button className="text-button" type="button" onClick={() => { locationRequestId.current++; setLocationBusy(false); setFilters(current => ({ ...current, origin: undefined })); setLocationMessage('Demo distances from downtown Durham.'); }}>{t('Use demo location')}</button>}</p>
           </form>
 
           <div className="quick-filters" aria-label="Quick filters">
-            <span>Quick picks</span>
-            <button type="button" className={filters.visitMode === 'walk-in' ? 'active' : ''} onClick={() => applyQuickFilter('walk-in')}>Walk-in care</button>
-            <button type="button" className={filters.visitMode === 'scheduled' ? 'active' : ''} onClick={() => applyQuickFilter('scheduled')}>Scheduled visits</button>
-            <button type="button" className={filters.timing === 'open-now' ? 'active' : ''} onClick={() => applyQuickFilter('open')}>Open now</button>
-            <button type="button" className={filters.specialty === 'Pediatrics' ? 'active' : ''} onClick={() => applyQuickFilter('pediatrics')}>Pediatrics</button>
-            <button type="button" className={filters.insurance === 'Medicaid' ? 'active' : ''} onClick={() => applyQuickFilter('medicaid')}>Medicaid accepted</button>
+            <span>{t("Quick picks")}</span>
+            <button type="button" className={filters.visitMode === 'walk-in' ? 'active' : ''} onClick={() => applyQuickFilter('walk-in')}>{t("Walk-in care")}</button>
+            <button type="button" className={filters.visitMode === 'scheduled' ? 'active' : ''} onClick={() => applyQuickFilter('scheduled')}>{t("Scheduled visits")}</button>
+            <button type="button" className={filters.timing === 'open-now' ? 'active' : ''} onClick={() => applyQuickFilter('open')}>{t("Open now")}</button>
+            <button type="button" className={filters.specialty === 'Pediatrics' ? 'active' : ''} onClick={() => applyQuickFilter('pediatrics')}>{t("Pediatrics")}</button>
+            <button type="button" className={filters.insurance === 'Medicaid' ? 'active' : ''} onClick={() => applyQuickFilter('medicaid')}>{t("Medicaid accepted")}</button>
           </div>
         </div>
       </section>
@@ -184,78 +200,90 @@ export function FindCarePage() {
               <strong>{new Date(upcoming.appointmentTime).getDate()}</strong>
             </div>
             <div className="upcoming-main">
-              <div className="upcoming-kicker"><CalendarClock aria-hidden="true" /> {upcoming.isSample ? 'Sample upcoming visit' : 'Upcoming visit'}</div>
+              <div className="upcoming-kicker"><CalendarClock aria-hidden="true" /> {upcoming.isSample ? t("Sample upcoming visit") : t("Upcoming visit")}</div>
               <h2 id="upcoming-title">{upcomingClinic.name}</h2>
               <p>{formatDateTime(upcoming.appointmentTime)} · {upcomingClinic.address}</p>
             </div>
             <div className="upcoming-plan">
               <div>
-                <span>Suggested leave-by</span>
+                <span>{t("Suggested leave-by")}</span>
                 <strong>{formatTime(upcomingPlan.leaveBy.toISOString())}</strong>
               </div>
               <div>
-                <span>Current visit estimate</span>
-                <strong>{upcomingPlan.estimate.totalMinutes} min</strong>
+                <span>{t("Current visit estimate")}</span>
+                <strong>{upcomingPlan.estimate.totalMinutes} {t("min")}</strong>
               </div>
             </div>
-            <Link className="button button-secondary" to="/saved">View plan <ArrowRight aria-hidden="true" /></Link>
+            <Link className="button button-secondary" to="/saved">{t("View plan")} <ArrowRight aria-hidden="true" /></Link>
           </section>
         )}
 
         <section className="find-main" id="clinic-results" aria-labelledby="results-title">
-          <aside className={filtersOpen ? 'filter-panel open' : 'filter-panel'} aria-label="Search filters">
+          <aside className={filtersOpen ? 'filter-panel open' : 'filter-panel'} aria-label={t("Search filters")} data-tour="filters" id="care-filters">
             <div className="filter-heading">
-              <div><SlidersHorizontal aria-hidden="true" /><h2>Filter care</h2></div>
-              {activeFilterCount > 0 && <button type="button" onClick={clearFilters}>Clear all</button>}
+              <div><SlidersHorizontal aria-hidden="true" /><h2>{t("Filter care")} {activeFilterCount > 0 && <small>({activeFilterCount})</small>}</h2></div>
+              {activeFilterCount > 0 && <button type="button" onClick={clearFilters}>{t("Clear all")}</button>}
             </div>
 
             <label className="field-label">
-              <span>Location</span>
-              <div className="field-with-icon readonly-field"><MapPin aria-hidden="true" /><span>Durham, NC</span></div>
+              <span>{t("Location")}</span>
+              <input aria-label={t("Search location or neighborhood")} placeholder={t("Durham neighborhood or ZIP")} value={filters.query} onChange={event => updateFilter("query", event.target.value)} />
             </label>
             <label className="field-label">
-              <span>Within</span>
+              <span>{t("Within")}</span>
               <div className="select-wrap">
                 <select value={filters.maxDistance} onChange={(event) => updateFilter('maxDistance', Number(event.target.value))}>
-                  <option value={3}>3 miles</option>
-                  <option value={5}>5 miles</option>
-                  <option value={10}>10 miles</option>
-                  <option value={25}>25 miles</option>
+                  <option value={3}>{t("3 miles")}</option>
+                  <option value={5}>{t("5 miles")}</option>
+                  <option value={10}>{t("10 miles")}</option>
+                  <option value={25}>{t("25 miles")}</option>
                 </select>
                 <ChevronDown aria-hidden="true" />
               </div>
             </label>
             <label className="field-label">
-              <span>Insurance</span>
+              <span>{t("Insurance")}</span>
               <div className="select-wrap">
                 <select value={filters.insurance} onChange={(event) => updateFilter('insurance', event.target.value)}>
-                  <option value="">Any insurance</option>
+                  <option value="">{t("Any insurance")}</option>
                   {insurancePlans.map((plan) => <option key={plan.id} value={plan.name}>{plan.name}</option>)}
                 </select>
                 <ChevronDown aria-hidden="true" />
               </div>
             </label>
             <label className="field-label">
-              <span>Specialty</span>
+              <span>{t("Specialty")}</span>
               <div className="select-wrap">
                 <select value={filters.specialty} onChange={(event) => updateFilter('specialty', event.target.value)}>
-                  <option value="">Any specialty</option>
+                  <option value="">{t("Any specialty")}</option>
                   {specialtyOptions.map((specialty) => <option key={specialty} value={specialty}>{specialty}</option>)}
                 </select>
                 <ChevronDown aria-hidden="true" />
               </div>
             </label>
+            <label className="field-label"><span>{t('Language')}</span><div className="select-wrap">
+              <select value={filters.language} onChange={event => updateFilter('language', event.target.value)}>
+                <option value="">{t('Any language')}</option>
+                {clinicLanguageOptions.map(language => <option key={language} value={language}>{t(language)}</option>)}
+              </select><ChevronDown aria-hidden="true" />
+            </div></label>
+            <label className="field-label"><span>{t('Minimum rating')}</span><div className="select-wrap">
+              <select value={filters.minimumRating} onChange={event => updateFilter('minimumRating', Number(event.target.value))}>
+                <option value={0}>{t('Any rating')}</option>
+                {[3, 3.5, 4, 4.5].map(rating => <option key={rating} value={rating}>{rating}+ / 5</option>)}
+              </select><ChevronDown aria-hidden="true" />
+            </div><small>{t('Fictional clinic reviews. No Google connection.')}</small></label>
             <fieldset className="filter-fieldset">
-              <legend>Visit type</legend>
+              <legend>{t("Visit type")}</legend>
               {(['all', 'scheduled', 'walk-in', 'urgent'] as const).map((mode) => (
                 <label key={mode}>
                   <input type="radio" name="visit-mode" checked={filters.visitMode === mode} onChange={() => updateFilter('visitMode', mode)} />
-                  <span>{mode === 'all' ? 'Any visit type' : mode === 'walk-in' ? 'Walk-in' : mode[0].toUpperCase() + mode.slice(1)}</span>
+                  <span>{mode === 'all' ? t("Any visit type") : mode === 'walk-in' ? t("Walk-in") : mode[0].toUpperCase() + mode.slice(1)}</span>
                 </label>
               ))}
             </fieldset>
             <fieldset className="filter-fieldset">
-              <legend>When</legend>
+              <legend>{t("When")}</legend>
               {([
                 ['all', 'Any time'],
                 ['open-now', 'Open now'],
@@ -264,44 +292,42 @@ export function FindCarePage() {
               ] as const).map(([value, label]) => (
                 <label key={value}>
                   <input type="radio" name="timing" checked={filters.timing === value} onChange={() => updateFilter('timing', value)} />
-                  <span>{label}</span>
+                  <span>{t(label)}</span>
                 </label>
               ))}
             </fieldset>
-            <InfoNote>Time-of-day filters use historical patterns in this prototype.</InfoNote>
+            <InfoNote>{t("Morning and afternoon prioritize shorter historical visits when sorted by nearest. All data is fictional.")}</InfoNote>
           </aside>
 
           <div className="results-column">
             <div className="mobile-filter-row">
-              <button className="button button-secondary" type="button" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen}>
-                <SlidersHorizontal aria-hidden="true" /> Filters {activeFilterCount > 0 && <b>{activeFilterCount}</b>}
+              <button className="button button-secondary" type="button" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen} aria-controls="care-filters">
+                <SlidersHorizontal aria-hidden="true" /> {t("Filters")} {activeFilterCount > 0 && <b>{activeFilterCount}</b>}
               </button>
-              {activeFilterCount > 0 && <button className="text-button" type="button" onClick={clearFilters}>Clear</button>}
+              {activeFilterCount > 0 && <button className="text-button" type="button" onClick={clearFilters}>{t("Clear")}</button>}
             </div>
 
             <div className="results-toolbar">
               <div>
-                <span className="eyebrow">Care near Durham</span>
-                <h2 id="results-title">{loading ? 'Finding options…' : `${sortedResults.length} clinic${sortedResults.length === 1 ? '' : 's'} fit your plan`}</h2>
-                <p>Every time shown is a total-visit estimate with a separate confidence signal.</p>
+                <span className="eyebrow">{t("Care near Durham")}</span>
+                <h2 id="results-title">{loading ? t('Finding options…') : t('Clinics matching your plan: {count}', { count: sortedResults.length })}</h2>
+                <p>{t("Every time shown is a total-visit estimate with a separate confidence signal.")}</p>
               </div>
               <div className="toolbar-actions">
                 <label className="sort-control">
-                  <span className="sr-only">Sort results</span>
+                  <span className="sr-only">{t("Sort results")}</span>
                   <select value={sort} onChange={(event) => setSort(event.target.value as SortMode)}>
-                    <option value="distance">Nearest first</option>
-                    <option value="shortest">Shortest visit</option>
-                    <option value="reliability">Highest confidence</option>
+                    <option value="distance">{t("Nearest first")}</option>
+                    <option value="shortest">{t("Shortest visit")}</option>
+                    <option value="reliability">{t("Highest confidence")}</option>
                   </select>
                   <ChevronDown aria-hidden="true" />
                 </label>
-                <div className="view-toggle" aria-label="Results view">
+                <div className="view-toggle" aria-label={t("Results view")}>
                   <button type="button" className={view === 'list' ? 'active' : ''} onClick={() => setView('list')} aria-pressed={view === 'list'}>
-                    <Navigation aria-hidden="true" /> List
-                  </button>
+                    <Navigation aria-hidden="true" /> {t("List")} </button>
                   <button type="button" className={view === 'map' ? 'active' : ''} onClick={() => setView('map')} aria-pressed={view === 'map'}>
-                    <Map aria-hidden="true" /> Map
-                  </button>
+                    <Map aria-hidden="true" /> {t("Map")} </button>
                 </div>
               </div>
             </div>
@@ -311,16 +337,16 @@ export function FindCarePage() {
             ) : error ? (
               <div className="empty-state" role="alert">
                 <span className="empty-icon"><Timer aria-hidden="true" /></span>
-                <h3>We couldn’t load the demo clinics</h3>
-                <p>The sample service had a problem. Your filters are still here.</p>
-                <button className="button button-primary" type="button" onClick={loadResults}>Try again</button>
+                <h3>{t("We couldn’t load the demo clinics")}</h3>
+                <p>{t("The sample service had a problem. Your filters are still here.")}</p>
+                <button className="button button-primary" type="button" onClick={loadResults}>{t("Try again")}</button>
               </div>
             ) : sortedResults.length === 0 ? (
               <div className="empty-state">
                 <span className="empty-icon"><Search aria-hidden="true" /></span>
-                <h3>No clinics match everything yet</h3>
-                <p>Try a wider distance or remove one filter. You won’t lose your search text.</p>
-                <button className="button button-primary" type="button" onClick={clearFilters}>Clear filters</button>
+                <h3>{t("No clinics match everything yet")}</h3>
+                <p>{t("Try a wider distance or remove one filter. You won’t lose your search text.")}</p>
+                <button className="button button-primary" type="button" onClick={clearFilters}>{t("Clear filters")}</button>
               </div>
             ) : view === 'map' ? (
               <MapView
@@ -341,10 +367,10 @@ export function FindCarePage() {
               <div className="results-end-note">
                 <Sparkles aria-hidden="true" />
                 <div>
-                  <strong>Why confidence matters</strong>
-                  <p>A 45-minute estimate with low confidence may be harder to plan around than a 55-minute estimate backed by fresh, consistent reports.</p>
+                  <strong>{t("Why confidence matters")}</strong>
+                  <p>{t("A 45-minute estimate with low confidence may be harder to plan around than a 55-minute estimate backed by fresh, consistent reports.")}</p>
                 </div>
-                <Link to="/know#reliability">Learn more <ArrowRight aria-hidden="true" /></Link>
+                <Link to="/know#reliability">{t("Learn more")} <ArrowRight aria-hidden="true" /></Link>
               </div>
             )}
           </div>

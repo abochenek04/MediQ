@@ -1,14 +1,14 @@
 import type { Clinic, SavedAppointment } from '../types';
 
 export const formatDate = (iso: string, options?: Intl.DateTimeFormatOptions) =>
-  new Intl.DateTimeFormat('en-US', options || {
+  new Intl.DateTimeFormat(typeof document === 'undefined' ? 'en-US' : document.documentElement.lang || 'en-US', options || {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
   }).format(new Date(iso));
 
 export const formatTime = (iso: string) =>
-  new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(new Date(iso));
+  new Intl.DateTimeFormat(typeof document === 'undefined' ? 'en-US' : document.documentElement.lang || 'en-US', { hour: 'numeric', minute: '2-digit' }).format(new Date(iso));
 
 export const formatDateTime = (iso: string) => `${formatDate(iso)} · ${formatTime(iso)}`;
 

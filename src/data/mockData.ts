@@ -91,7 +91,7 @@ export const clinics: Clinic[] = [
           { label: 'Arrival to check-in', shortLabel: 'Check in', minutes: 7 },
           { label: 'Check-in to provider', shortLabel: 'Wait', minutes: 24 },
           { label: 'Face-to-face provider time', shortLabel: 'Care', minutes: 17 },
-          { label: 'Provider to departure', shortLabel: 'Wrap up', minutes: 6 },
+          { label: 'Provider to departure', shortLabel: 'Check out', minutes: 6 },
         ],
         updatedMinutesAgo: 6,
         contributingReports: 18,
@@ -101,10 +101,10 @@ export const clinics: Clinic[] = [
         totalMinutes: 72,
         range: [52, 96],
         stages: [
-          { label: 'Arrival to triage', shortLabel: 'Triage', minutes: 9 },
+          { label: 'Arrival to triage', shortLabel: 'Check in', minutes: 9 },
           { label: 'Triage to provider', shortLabel: 'Wait', minutes: 35 },
           { label: 'Face-to-face provider time', shortLabel: 'Care', minutes: 21 },
-          { label: 'Provider to departure', shortLabel: 'Wrap up', minutes: 7 },
+          { label: 'Provider to departure', shortLabel: 'Check out', minutes: 7 },
         ],
         updatedMinutesAgo: 6,
         contributingReports: 11,
@@ -203,7 +203,7 @@ export const clinics: Clinic[] = [
           { label: 'Arrival to check-in', shortLabel: 'Check in', minutes: 8 },
           { label: 'Check-in to provider', shortLabel: 'Wait', minutes: 17 },
           { label: 'Face-to-face provider time', shortLabel: 'Care', minutes: 29 },
-          { label: 'Provider to departure', shortLabel: 'Wrap up', minutes: 9 },
+          { label: 'Provider to departure', shortLabel: 'Check out', minutes: 9 },
         ],
       },
       {
@@ -212,7 +212,7 @@ export const clinics: Clinic[] = [
           { label: 'Arrival to check-in', shortLabel: 'Check in', minutes: 9 },
           { label: 'Check-in to provider', shortLabel: 'Wait', minutes: 41 },
           { label: 'Face-to-face provider time', shortLabel: 'Care', minutes: 29 },
-          { label: 'Provider to departure', shortLabel: 'Wrap up', minutes: 9 },
+          { label: 'Provider to departure', shortLabel: 'Check out', minutes: 9 },
         ],
       },
     ],
@@ -292,7 +292,7 @@ export const clinics: Clinic[] = [
           { label: 'Arrival to check-in', shortLabel: 'Check in', minutes: 6 },
           { label: 'Check-in to provider', shortLabel: 'Wait', minutes: 13 },
           { label: 'Face-to-face provider time', shortLabel: 'Care', minutes: 24 },
-          { label: 'Provider to departure', shortLabel: 'Wrap up', minutes: 6 },
+          { label: 'Provider to departure', shortLabel: 'Check out', minutes: 6 },
         ],
       },
       {
@@ -301,7 +301,7 @@ export const clinics: Clinic[] = [
           { label: 'Arrival to check-in', shortLabel: 'Check in', minutes: 7 },
           { label: 'Check-in to provider', shortLabel: 'Wait', minutes: 33 },
           { label: 'Face-to-face provider time', shortLabel: 'Care', minutes: 24 },
-          { label: 'Provider to departure', shortLabel: 'Wrap up', minutes: 7 },
+          { label: 'Provider to departure', shortLabel: 'Check out', minutes: 7 },
         ],
       },
     ],
@@ -381,7 +381,7 @@ export const clinics: Clinic[] = [
           { label: 'Arrival to check-in', shortLabel: 'Check in', minutes: 8 },
           { label: 'Check-in to provider', shortLabel: 'Wait', minutes: 22 },
           { label: 'Face-to-face provider time', shortLabel: 'Care', minutes: 37 },
-          { label: 'Provider to departure', shortLabel: 'Wrap up', minutes: 9 },
+          { label: 'Provider to departure', shortLabel: 'Check out', minutes: 9 },
         ],
       },
     ],
@@ -453,7 +453,7 @@ export const clinics: Clinic[] = [
           { label: 'Arrival to check-in', shortLabel: 'Check in', minutes: 12 },
           { label: 'Check-in to provider', shortLabel: 'Wait', minutes: 34 },
           { label: 'Face-to-face provider time', shortLabel: 'Care', minutes: 30 },
-          { label: 'Provider to departure', shortLabel: 'Wrap up', minutes: 8 },
+          { label: 'Provider to departure', shortLabel: 'Check out', minutes: 8 },
         ],
       },
       {
@@ -462,7 +462,7 @@ export const clinics: Clinic[] = [
           { label: 'Arrival to check-in', shortLabel: 'Check in', minutes: 14 },
           { label: 'Check-in to provider', shortLabel: 'Wait', minutes: 58 },
           { label: 'Face-to-face provider time', shortLabel: 'Care', minutes: 31 },
-          { label: 'Provider to departure', shortLabel: 'Wrap up', minutes: 9 },
+          { label: 'Provider to departure', shortLabel: 'Check out', minutes: 9 },
         ],
       },
     ],
@@ -534,7 +534,7 @@ export const clinics: Clinic[] = [
           { label: 'Arrival to check-in', shortLabel: 'Check in', minutes: 6 },
           { label: 'Check-in to provider', shortLabel: 'Wait', minutes: 18 },
           { label: 'Face-to-face provider time', shortLabel: 'Care', minutes: 15 },
-          { label: 'Provider to departure', shortLabel: 'Wrap up', minutes: 5 },
+          { label: 'Provider to departure', shortLabel: 'Check out', minutes: 5 },
         ],
       },
     ],
@@ -578,6 +578,17 @@ export const clinics: Clinic[] = [
     takeaway: 'Midweek mornings have historically been quickest.',
   },
 ];
+
+// Clinic ratings derive from the existing fictional clinic reviews, not provider scores.
+// A future adapter can populate the same structure with an attributed source.
+for (const clinic of clinics) {
+  if (clinic.reviews.length) clinic.rating = {
+    rating: Math.round(clinic.reviews.reduce((sum, review) => sum + review.overall, 0) / clinic.reviews.length * 10) / 10,
+    reviewCount: clinic.reviews.length,
+    source: 'demo',
+  };
+}
+export const clinicLanguageOptions = [...new Set(clinics.flatMap((clinic) => clinic.languages))].sort();
 
 const sampleTime = new Date(Date.now() + 1000 * 60 * 60 * 45);
 sampleTime.setMinutes(30, 0, 0);

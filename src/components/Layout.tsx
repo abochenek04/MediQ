@@ -9,6 +9,7 @@ import {
 import type { ReactNode } from 'react';
 import { languages } from '../data/mockData';
 import { useApp } from '../context/AppContext';
+import { ProductTour } from './ProductTour';
 import { Brand } from './Brand';
 import { Link } from '../utils/navigation';
 
@@ -32,6 +33,7 @@ export function Layout({ children, currentPath }: { children: ReactNode; current
           <nav className="desktop-nav" aria-label="Primary navigation">
             {navItems.map((item) => (
               <Link
+                data-tour={item.to === '/find' ? 'find' : item.to === '/saved' ? 'appointments' : item.to === '/report' ? 'report' : undefined}
                 key={item.to}
                 to={item.to}
                 className={isActive(currentPath, item.to) ? 'nav-link active' : 'nav-link'}
@@ -41,17 +43,7 @@ export function Layout({ children, currentPath }: { children: ReactNode; current
               </Link>
             ))}
           </nav>
-          <label className="language-control">
-            <Languages aria-hidden="true" size={17} />
-            <span className="sr-only">{t('language')}</span>
-            <select value={language} onChange={(event) => setLanguage(event.target.value)}>
-              {languages.map((item) => (
-                <option value={item.code} key={item.code}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <LanguageSelector />
         </div>
       </header>
 
@@ -61,32 +53,33 @@ export function Layout({ children, currentPath }: { children: ReactNode; current
         <div className="shell footer-grid">
           <div>
             <Brand compact />
-            <p className="footer-promise">Healthcare is unpredictable. Your schedule shouldn’t be.</p>
+            <p className="footer-promise">{t("Healthcare is unpredictable. Your schedule shouldn’t be.")}</p>
           </div>
           <div className="footer-note">
             <span className="demo-dot" />
             <p>
-              <strong>Prototype only.</strong> All clinics, people, reports, availability, and estimates are fictional.
-            </p>
+              <strong>{t("Prototype only.")}</strong> {t("All clinics, people, reports, availability, and estimates are fictional.")} </p>
           </div>
           <div className="footer-links">
-            <Link to="/know#privacy">Privacy approach</Link>
-            <Link to="/know#limitations">Data limitations</Link>
-            <Link to="/know#safety">Safety</Link>
+            <Link to="/contact">{t('Contact Us')}</Link>
+            <button className="text-button" type="button" onClick={() => window.dispatchEvent(new Event('mediq:tour'))}>{t('Product tour')}</button>
+            <Link to="/know#privacy">{t("Privacy approach")}</Link>
+            <Link to="/know#limitations">{t("Data limitations")}</Link>
+            <Link to="/know#safety">{t("Safety")}</Link>
           </div>
         </div>
       </footer>
 
       <nav className="mobile-nav" aria-label="Mobile navigation">
-        <Link to="/find" className={isActive(currentPath, '/find') ? 'active' : ''}>
+        <Link data-tour="find" to="/find" className={isActive(currentPath, '/find') ? 'active' : ''}>
           <House aria-hidden="true" />
           <span>{t('findCare')}</span>
         </Link>
-        <Link to="/saved" className={isActive(currentPath, '/saved') ? 'active' : ''}>
+        <Link data-tour="appointments" to="/saved" className={isActive(currentPath, '/saved') ? 'active' : ''}>
           <CalendarDays aria-hidden="true" />
           <span>{t('saved')}</span>
         </Link>
-        <Link to="/report" className={isActive(currentPath, '/report') ? 'active' : ''}>
+        <Link data-tour="report" to="/report" className={isActive(currentPath, '/report') ? 'active' : ''}>
           <MessageSquarePlus aria-hidden="true" />
           <span>{t('reportWait')}</span>
         </Link>
@@ -96,6 +89,7 @@ export function Layout({ children, currentPath }: { children: ReactNode; current
         </Link>
       </nav>
 
+      <ProductTour currentPath={currentPath} />
       <div className="toast-region" aria-live="polite" aria-atomic="false">
         {toasts.map((toast) => (
           <div className={`toast toast-${toast.tone || 'default'}`} key={toast.id} role="status">
@@ -106,4 +100,9 @@ export function Layout({ children, currentPath }: { children: ReactNode; current
       </div>
     </div>
   );
+}
+
+export function LanguageSelector() {
+  const { language, setLanguage, t } = useApp();
+  return <label className="language-control"><Languages aria-hidden="true" size={17} /><span className="sr-only">{t('language')}</span><select value={language} onChange={event => setLanguage(event.target.value)}>{languages.map(item => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>;
 }

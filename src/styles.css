@@ -4,8 +4,8 @@
   --teal: #16443f;
   --teal-2: #1f5a52;
   --teal-soft: #d9ebe4;
-  --coral: #ef7862;
-  --coral-deep: #d75d49;
+  --coral: #e9aa94;
+  --coral-deep: #9a4938;
   --coral-soft: #f8ded7;
   --mint: #83bda8;
   --mint-soft: #e6f2ed;
@@ -13,11 +13,11 @@
   --gold-soft: #f5ebc8;
   --blue: #779cac;
   --blue-soft: #e2edf1;
-  --cream: #f7f3ea;
-  --paper: #fffdf8;
+  --cream: #f5f6f2;
+  --paper: #fdfefa;
   --white: #ffffff;
   --muted: #63746f;
-  --muted-2: #87948f;
+  --muted-2: #63746f;
   --line: #dce3de;
   --line-dark: rgba(255, 255, 255, 0.18);
   --danger: #ad3e35;
@@ -25,8 +25,8 @@
   --shadow-md: 0 14px 42px rgba(20, 63, 58, 0.1);
   --shadow-lg: 0 28px 80px rgba(8, 39, 36, 0.18);
   --radius-sm: 10px;
-  --radius: 18px;
-  --radius-lg: 28px;
+  --radius: 14px;
+  --radius-lg: 22px;
   --font-body: Inter, Avenir, "Segoe UI", Helvetica, Arial, sans-serif;
   --font-display: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
 }
@@ -6339,3 +6339,85 @@ h3 {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Second-generation refinements extend the original responsive component system. */
+.location-status { font-size: .78rem; margin: 10px 0 0; line-height: 1.5; }
+.location-status .text-button { text-decoration: underline; color: inherit; }
+.filter-heading h2 small { font: inherit; color: var(--muted); }
+.filter-panel .field-label small { font-size: .72rem; font-weight: 400; color: var(--muted); }
+.native-modal { position: fixed; inset: 0; height: fit-content; border: 1px solid var(--line); color: var(--ink); max-height: calc(100dvh - 32px); width: min(540px, calc(100vw - 32px)); overflow: auto; margin: auto; }
+.native-modal::backdrop { background: rgba(15,48,45,.48); backdrop-filter: blur(3px); }
+.native-modal > h2 { padding-inline-end: 28px; }
+.native-modal form { gap: 18px; }
+.modal-actions, .tour-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.modal-actions a { font-size:.82rem; text-decoration:underline; }
+.checkbox-line { display:flex; align-items:center; gap:10px; font-size:.88rem; }
+.checkbox-line input { width:18px; height:18px; accent-color:var(--teal); }
+.field-hint { font-size:.8rem; color:var(--muted); margin:0; }
+.quick-confirmation { display:grid; gap:12px; }
+.journey-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; padding:20px 0 28px; }
+.journey-strip span { display:flex; align-items:center; gap:8px; font-size:.85rem; font-weight:600; }
+.journey-strip b { display:grid; place-items:center; width:28px; height:28px; border:1px solid var(--line); border-radius:50%; background:var(--paper); flex-shrink:0; }
+.about-nav { display:flex; flex-wrap:wrap; gap:12px 24px; border-block:1px solid var(--line); padding:18px 0; }
+.about-nav a { font-weight:600; font-size:.9rem; }
+.about-section { padding:40px 0; border-bottom:1px solid var(--line); scroll-margin-top:110px; }
+.about-section h2 { font-size:clamp(1.7rem,4vw,2.3rem); margin:8px 0 16px; }
+.about-section > p { max-width:75ch; color:var(--muted); }
+.about-section details { margin:16px 0; padding:16px 20px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--paper); }
+.about-section summary { cursor:pointer; font-weight:600; }
+.patient-journey { list-style:none; padding:0; display:grid; grid-template-columns:repeat(5,1fr); gap:18px; }
+.patient-journey li > b { width:32px; height:32px; background:var(--teal-soft); display:grid; place-items:center; border-radius:50%; }
+.patient-journey h3 { font-size:1rem; margin:12px 0 6px; }
+.patient-journey p { font-size:.88rem; color:var(--muted); }
+.about-estimate { background:var(--paper); border:1px solid var(--line); padding:24px; border-radius:var(--radius); margin:24px 0; }
+.about-estimate > strong { display:block; font-size:2.5rem; margin-bottom:18px; }
+.about-estimate > strong small { font-size:.9rem; font-weight:400; }
+.contact-shell { max-width:760px; }
+.contact-form { display:grid; gap:22px; margin-top:28px; }
+.contact-form p { font-size:.88rem; color:var(--muted); }
+.contact-shell .text-link { margin:20px; }
+.tour-highlight { position:fixed; pointer-events:none; border:2px solid var(--teal-2); box-shadow:0 0 0 4px rgba(131,189,168,.35); border-radius:10px; z-index:80; }
+.product-tour { position:fixed; z-index:90; bottom:24px; inset-inline-end:24px; width:min(380px, calc(100vw - 32px)); padding:24px; background:var(--paper); border:1px solid var(--teal-soft); border-radius:var(--radius); box-shadow:var(--shadow-md); }
+.product-tour h2 { font-size:1.4rem; margin:10px 20px 8px 0; }
+.product-tour p { font-size:.9rem; color:var(--muted); margin:0 0 20px; }
+.product-tour .eyebrow { padding-inline-end:20px; }
+.tour-actions > div { display:flex; gap:8px; }
+.tour-actions .button { padding:8px 12px; min-height:40px; }
+.footer-links .text-button { text-align:start; padding:0; font-size:inherit; }
+.onboarding-copy h1 { max-width:8.5em; text-wrap:balance; }
+.onboarding-brand-row .language-control { background:var(--paper); color:var(--ink); border-radius:8px; padding:4px 8px; margin-inline-start:auto; }
+.stage-labels > div { min-width:0; }
+.stage-labels { gap:10px; }
+[dir="rtl"] .modal-close { right:auto; left:16px; }
+[dir="rtl"] .time-arrow { transform:rotate(180deg); }
+@media (max-width: 960px) {
+ .patient-journey { grid-template-columns:1fr; }
+ .patient-journey li { display:flex; gap:16px; }
+ .patient-journey li > b { flex-shrink:0; }
+ .patient-journey h3 { margin:2px 0 4px; }
+ .patient-journey p { margin:0; }
+ .product-tour { bottom:92px; inset-inline-end:16px; }
+ .journey-strip { gap:6px; }
+ .journey-strip span { flex-direction:column; text-align:center; font-size:.75rem; }
+}
+@media (max-width: 480px) {
+ .onboarding-brand-row { flex-wrap:wrap; gap:12px; }
+ .onboarding-brand-row .demo-badge { display:none; }
+ .product-tour { padding:18px; }
+ .native-modal { padding:24px 18px; }
+ .clinic-supporting { flex-wrap:wrap; }
+ .stage-labels { gap:6px; font-size:.68rem; }
+ .mobile-nav span { overflow-wrap:anywhere; font-size:.65rem; }
+}
+.review-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.review-metrics > div { min-width: 0; }
+.review-metrics dt { overflow-wrap: anywhere; }
+.review-metrics dd { margin: 0; }
+@media (max-width: 960px) {
+  .review-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 0; }
+}
+@media (max-width: 480px) {
+  .review-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.profile-grid > *, .history-chart-wrap, .chart-scroll { min-width: 0; }
+.chart-scroll { max-width: 100%; overflow-x: auto; }

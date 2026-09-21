@@ -59,6 +59,10 @@ export interface PatientReport {
   communication?: number;
   rushed?: boolean;
   note?: string;
+  reportKind?: 'completed-visit' | 'current-wait';
+  elapsedMinutes?: number;
+  visitDate?: string;
+  timing?: Pick<WaitReportDraft, 'arrivalTime' | 'checkInTime' | 'providerTime' | 'departureTime' | 'totalRange'>;
 }
 
 export interface Provider {
@@ -92,6 +96,17 @@ export interface ClinicHours {
   today: string;
 }
 
+export interface ClinicRating {
+  rating: number;
+  reviewCount: number;
+  source: 'demo' | 'google-places' | 'clinic';
+}
+
+export interface SearchOrigin {
+  latitude: number;
+  longitude: number;
+}
+
 export interface Clinic {
   id: string;
   name: string;
@@ -110,6 +125,7 @@ export interface Clinic {
   symptoms: string[];
   insurance: string[];
   languages: string[];
+  rating?: ClinicRating;
   estimates: LiveWaitEstimate[];
   historicalWaits: HistoricalWaitRecord[];
   reliability: ReliabilityScore;
@@ -130,6 +146,9 @@ export interface SearchFilters {
   visitMode: VisitMode | 'all';
   timing: 'all' | 'open-now' | 'morning' | 'afternoon';
   maxDistance: number;
+  language: string;
+  minimumRating: number;
+  origin?: SearchOrigin;
 }
 
 export interface SavedAppointment {
@@ -143,6 +162,8 @@ export interface SavedAppointment {
 }
 
 export interface WaitReportDraft {
+  reportKind?: 'completed-visit' | 'current-wait';
+  elapsedMinutes?: number;
   clinicId: string;
   visitMode: VisitMode;
   visitDate: string;

@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { interfaceTranslations } from './interfaceTranslations';
 import { sampleAppointment } from '../data/mockData';
 import { clinicService } from '../services/clinicService';
 import type { AppToast, PatientReport, SavedAppointment, WaitReportDraft } from '../types';
@@ -26,7 +27,7 @@ interface AppContextValue {
   submitReport: (draft: WaitReportDraft) => Promise<PatientReport>;
   setLanguage: (language: string) => void;
   pushToast: (message: string, tone?: ToastTone) => void;
-  t: (key: TranslationKey) => string;
+  t: (key: string, values?: Record<string, string | number>) => string;
 }
 
 type TranslationKey =
@@ -43,9 +44,9 @@ type TranslationKey =
 const translations: Record<string, Record<TranslationKey, string>> = {
   en: {
     findCare: 'Find care',
-    saved: 'Saved',
+    saved: 'Appointments',
     reportWait: 'Report wait',
-    howItWorks: 'How it works',
+    howItWorks: 'About',
     language: 'Language',
     heroEyebrow: 'Care planning for real life',
     heroTitle: 'Know before you go.',
@@ -54,9 +55,9 @@ const translations: Record<string, Record<TranslationKey, string>> = {
   },
   es: {
     findCare: 'Buscar atención',
-    saved: 'Guardado',
+    saved: 'Citas',
     reportWait: 'Reportar espera',
-    howItWorks: 'Cómo funciona',
+    howItWorks: 'Acerca de MediQ',
     language: 'Idioma',
     heroEyebrow: 'Planificación para la vida real',
     heroTitle: 'Infórmate antes de ir.',
@@ -65,9 +66,9 @@ const translations: Record<string, Record<TranslationKey, string>> = {
   },
   zh: {
     findCare: '寻找医疗服务',
-    saved: '已保存',
+    saved: '预约',
     reportWait: '报告等待时间',
-    howItWorks: '使用说明',
+    howItWorks: '关于',
     language: '语言',
     heroEyebrow: '贴近生活的就医规划',
     heroTitle: '出发前，心中有数。',
@@ -76,9 +77,9 @@ const translations: Record<string, Record<TranslationKey, string>> = {
   },
   ar: {
     findCare: 'ابحث عن رعاية',
-    saved: 'المحفوظات',
+    saved: 'المواعيد',
     reportWait: 'الإبلاغ عن الانتظار',
-    howItWorks: 'كيف يعمل',
+    howItWorks: 'حول MediQ',
     language: 'اللغة',
     heroEyebrow: 'تخطيط للرعاية يناسب حياتك',
     heroTitle: 'اعرف قبل أن تذهب.',
@@ -109,7 +110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     readStored('mediq-reports', []),
   );
   const [language, updateLanguage] = useState(() =>
-    window.localStorage.getItem('mediq-language') || 'en',
+    ['en', 'es', 'zh', 'ar'].includes(window.localStorage.getItem('mediq-language') || '') ? window.localStorage.getItem('mediq-language')! : 'en',
   );
   const [toasts, setToasts] = useState<AppToast[]>([]);
   const toastId = useRef(0);
@@ -131,6 +132,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
   }, [language]);
 
+  const t = useCallback((key: string, values?: Record<string, string | number>) => {
+    const locale = translations[language] || translations.en;
+    const column = ['es', 'zh', 'ar'].indexOf(language);
+    let text = locale[key as TranslationKey] || (column >= 0 ? interfaceTranslations[key]?.[column] : undefined) || key;
+    for (const [name, value] of Object.entries(values || {})) text = text.replaceAll(`{${name}}`, String(value));
+    return text;
+  }, [language]);
+
   const pushToast = useCallback((message: string, tone: ToastTone = 'default') => {
     const id = ++toastId.current;
     setToasts((current) => [...current, { id, message, tone }]);
@@ -141,40 +150,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const toggleSavedClinic = useCallback(
     (clinicId: string) => {
-      setSavedClinicIds((current) => {
-        const isSaved = current.includes(clinicId);
-        pushToast(isSaved ? 'Clinic removed from saved care.' : 'Clinic saved for later.', isSaved ? 'default' : 'success');
-        return isSaved ? current.filter((id) => id !== clinicId) : [...current, clinicId];
-      });
+      const isSaved = savedClinicIds.includes(clinicId);
+      setSavedClinicIds(current => isSaved ? current.filter(id => id !== clinicId) : [...current, clinicId]);
+      pushToast(t(isSaved ? 'Clinic removed from saved care.' : 'Clinic saved for later.'), isSaved ? 'default' : 'success');
     },
-    [pushToast],
+    [pushToast, t, savedClinicIds],
   );
 
   const saveAppointment = useCallback(
     async (appointment: SavedAppointment) => {
       const saved = await clinicService.saveAppointment(appointment);
       setSavedAppointments((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
-      pushToast('Visit saved. Your planning window is ready.', 'success');
+      pushToast(t('Visit saved. Your planning window is ready.'), 'success');
     },
-    [pushToast],
+    [pushToast, t],
   );
 
   const removeAppointment = useCallback(
     (appointmentId: string) => {
       setSavedAppointments((current) => current.filter((item) => item.id !== appointmentId));
-      pushToast('Saved visit removed.');
+      pushToast(t('Saved visit removed.'));
     },
-    [pushToast],
+    [pushToast, t],
   );
 
   const submitReport = useCallback(
     async (draft: WaitReportDraft) => {
       const result = await clinicService.submitWaitReport(draft);
       setSubmittedReports((current) => [result, ...current]);
-      pushToast('Thank you—your sample report was added.', 'success');
+      pushToast(t('Thank you—your sample report was added.'), 'success');
       return result;
     },
-    [pushToast],
+    [pushToast, t],
   );
 
   const setLanguage = useCallback(
@@ -183,19 +190,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       window.localStorage.setItem('mediq-language', nextLanguage);
       document.documentElement.lang = nextLanguage;
       document.documentElement.dir = nextLanguage === 'ar' ? 'rtl' : 'ltr';
-      pushToast(
-        nextLanguage === 'en'
-          ? 'Language set to English.'
-          : 'Language preference saved. Key prototype content is translated.',
-        'info',
-      );
+      const column = ['es', 'zh', 'ar'].indexOf(nextLanguage);
+      pushToast(column < 0 ? 'Language preference saved.' : interfaceTranslations['Language preference saved.'][column], 'info');
     },
-    [pushToast],
-  );
-
-  const t = useCallback(
-    (key: TranslationKey) => (translations[language] || translations.en)[key],
-    [language],
+    [pushToast, t],
   );
 
   const value = useMemo<AppContextValue>(
