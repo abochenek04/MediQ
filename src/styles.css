@@ -1041,6 +1041,7 @@ h3 {
 .find-hero-inner {
   position: relative;
   z-index: 2;
+  text-align: center;
 }
 
 .hero-orbit {
@@ -1070,7 +1071,8 @@ h3 {
 }
 
 .find-hero-copy {
-  max-width: 790px;
+  max-width: 1100px;
+  margin-inline: auto;
 }
 
 .find-hero-copy .eyebrow {
@@ -1080,11 +1082,13 @@ h3 {
 .find-hero h1 {
   margin-bottom: 14px;
   color: var(--white);
-  font-size: clamp(3.2rem, 6vw, 5.6rem);
+  font-size: clamp(1.5rem, 6vw, 5.6rem);
+  white-space: nowrap;
 }
 
 .find-hero-copy > p {
   max-width: 680px;
+  margin-inline: auto;
   margin-bottom: 30px;
   color: #d2e2dd;
   font-size: 1.05rem;
@@ -1092,6 +1096,7 @@ h3 {
 
 .care-search {
   width: min(900px, 100%);
+  margin-inline: auto;
 }
 
 .care-search > label {
@@ -1156,6 +1161,7 @@ h3 {
 .search-location {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 18px;
   margin-top: 11px;
   color: #c0d6cf;
@@ -1184,6 +1190,7 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   margin-top: 24px;
 }
@@ -5721,10 +5728,6 @@ h3 {
     padding-block: 48px 72px;
   }
 
-  .find-hero h1 {
-    font-size: clamp(3.2rem, 15vw, 4.7rem);
-  }
-
   .care-search-row {
     grid-template-columns: auto 1fr auto;
   }
@@ -5735,14 +5738,13 @@ h3 {
   }
 
   .search-location {
-    align-items: flex-start;
+    align-items: center;
     flex-direction: column;
     gap: 7px;
   }
 
   .quick-filters {
-    flex-wrap: nowrap;
-    overflow-x: auto;
+    flex-wrap: wrap;
     padding-bottom: 5px;
   }
 
@@ -6177,7 +6179,6 @@ h3 {
     padding: 8px;
   }
 
-  .find-hero h1,
   .know-hero h1 {
     font-size: 3.3rem;
   }
