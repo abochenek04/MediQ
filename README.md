@@ -27,6 +27,45 @@ npm run serve:dist  # Preview with client-route fallback
 npm test            # Build plus dependency-free route/asset smoke checks
 ```
 
+## Development vs. production: which should I use?
+
+Use **development mode** while editing MediQ. Use a **production build** when checking the finished app before a demo or preparing files for deployment.
+
+| | Development mode | Production build |
+| --- | --- | --- |
+| Command | `npm run dev` | `npm run build` |
+| Purpose | Make changes and test interactions as you work | Validate TypeScript and generate optimized deployment files |
+| What it does | Starts a local Vite development server | Creates the built application in `dist/`; does not start a server |
+| When you edit code | Changes usually appear immediately through hot reload | Run the build again to include new changes |
+| Debugging | Development warnings and error details help troubleshoot issues | Optimized output reflects what you would deploy |
+
+### While developing
+
+From the project folder, run:
+
+```bash
+npm run dev
+```
+
+Keep that terminal running while you edit files. Open the URL printed in the terminal and use **Ctrl+C** to stop the server. Run `npm run typecheck` separately when you want TypeScript validation without creating a production build; the development server is not a substitute for this check.
+
+### Before a demo or deployment
+
+Build the current source, then preview those exact files locally:
+
+```bash
+npm run build
+npm run preview
+```
+
+Only start the preview after the build succeeds. Preview serves the existing `dist/` files, so rebuild and refresh the browser after making further source changes. Stop the preview with **Ctrl+C**.
+
+This project configures both development and preview to use port **4173**. Stop one before starting the other, and always use the URL printed in the terminal if that port is already occupied.
+
+For deployment, use the generated `dist/` folder with a suitable hosting service. `npm run preview` is a local checking tool, not a production hosting service. Neither building nor previewing automatically publishes the site.
+
+Both modes contain the same MediQ features and fictional demo data. A production build does **not** activate real clinic data, Google ratings, booking, email, or other external integrations.
+
 ## Included product experience
 
 - Guest-first onboarding with free-account and future-Plus concepts
