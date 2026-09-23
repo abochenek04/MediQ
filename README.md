@@ -319,6 +319,10 @@ Deploy `dist/` to a static host.
 - **Cloudflare Pages:** build command `npm run build`, output directory `dist`; configure all unmatched routes to `/index.html`.
 - **Other servers:** return `index.html` for non-file routes so `/clinic/:id`, `/saved`, and `/report` survive refresh.
 
+## Backend implementation backlog
+
+Backend development is backlogged pending the next-version requirements. See [Backend implementation backlog](docs/backend-backlog.md) for the proposed phases, architecture options, existing integration points, and decisions to revisit. Implementation has not started, and technology choices remain provisional.
+
 ## Recommended next steps
 
 1. Conduct five to eight moderated patient usability sessions, including parents, hourly workers, and caregivers.
