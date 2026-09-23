@@ -1,4 +1,4 @@
-# MediQ - Sol
+# MediQ
 
 **Know before you go.**
 
@@ -98,9 +98,76 @@ Both modes contain the same MediQ features and fictional demo data. A production
 | `/clinic/:id` | Detailed clinic timing, reliability, providers, reviews, and queue concept |
 | `/saved` | Saved appointments, leave-by calculation, and saved clinics |
 | `/report` | Validated post-visit timing and experience report |
-| `/know` | Complete product, trust, privacy, pilot, business, and architecture guide |
+| `/know` | About: Why MediQ, Patient Journey, Wait Estimates, and Reliability |
+| `/contact` | Demo contact form; no message is sent |
 
 Every route can be opened directly when the host is configured to return `index.html` for unknown paths. Netlify and Vercel rewrite files are included.
+
+## Repository guide: where to make changes
+
+MediQ is currently a **frontend application** built with React and TypeScript. The UI, filtering, calculations, and mock services run in the browser. There is **no real backend or database yet**; saved clinics, appointments, reports, and preferences use browser storage.
+
+### What each folder does
+
+| Location | Responsibility |
+| --- | --- |
+| `src/pages/` | Complete screens and their interactions |
+| `src/components/` | Reusable UI pieces such as cards, navigation, dialogs, and the logo |
+| `src/styles.css` | Colors, fonts, spacing, alignment, and responsive layouts |
+| `src/context/` | Shared application state, actions, and translations |
+| `src/data/` | Fictional clinic, provider, review, and estimate data |
+| `src/services/` | Mock data operations and browser location access; future API connection points |
+| `src/utils/` | Shared calculations, navigation helpers, and report validation |
+| `src/types.ts` | Definitions of the fields in clinics, filters, appointments, and reports |
+| `public/` | Static assets such as the favicon and hosting rewrite file |
+| `scripts/` | Local preview and automated checks |
+| `docs/` | Product background and verification notes |
+
+`.tsx` files usually contain React UI plus interaction logic. `.ts` files usually contain data, types, or helpers. Neither extension means “backend.” The current `services/` files also run in the browser. A future backend would handle database storage, authentication, and server-side validation; the service layer would call its API.
+
+### If I want to change X, where do I go?
+
+| Change | Start here |
+| --- | --- |
+| Initial guest/account welcome screen | [OnboardingPage.tsx](src/pages/OnboardingPage.tsx) |
+| Find Care headline, search, quick picks, or filter controls | [FindCarePage.tsx](src/pages/FindCarePage.tsx) |
+| Clinic detail screen | [ClinicPage.tsx](src/pages/ClinicPage.tsx) |
+| Appointments and saved clinics | [SavedPage.tsx](src/pages/SavedPage.tsx) |
+| Full Report Wait form | [ReportPage.tsx](src/pages/ReportPage.tsx) |
+| About or Contact content | [KnowPage.tsx](src/pages/KnowPage.tsx), [ContactPage.tsx](src/pages/ContactPage.tsx) |
+| Colors, alignment, typography, or mobile layout | [styles.css](src/styles.css) |
+| Header, footer, or navigation | [Layout.tsx](src/components/Layout.tsx) |
+| Logo or browser-tab icon | [Brand.tsx](src/components/Brand.tsx), [favicon.svg](public/favicon.svg) |
+| Clinic cards, visit stages, map, or historical chart | [ClinicComponents.tsx](src/components/ClinicComponents.tsx) |
+| Shared dialogs, badges, loading, or safety messages | [UI.tsx](src/components/UI.tsx) |
+| Quick-report popup or product tour | [QuickReport.tsx](src/components/QuickReport.tsx), [ProductTour.tsx](src/components/ProductTour.tsx) |
+| Shared saved items, report submission, or notification messages | [AppContext.tsx](src/context/AppContext.tsx) |
+| Translated text | [interfaceTranslations.ts](src/context/interfaceTranslations.ts), plus the original translation keys in [AppContext.tsx](src/context/AppContext.tsx) |
+| Fictional clinic information or example estimates | [mockData.ts](src/data/mockData.ts) |
+| Which clinics match a filter or how mock reports are processed | [clinicService.ts](src/services/clinicService.ts) |
+| Browser location requests | [locationService.ts](src/services/locationService.ts) |
+| Leave-by/finish-time calculations or report validation | [time.ts](src/utils/time.ts), [report.ts](src/utils/report.ts) |
+| Data fields or allowed values | [types.ts](src/types.ts) |
+| Which page opens for a URL | [App.tsx](src/App.tsx); navigation helpers are in [navigation.tsx](src/utils/navigation.tsx) |
+
+`SavedPage.tsx` is the Appointments page, and `KnowPage.tsx` is About. Their original filenames and routes are retained for compatibility.
+
+### Common examples
+
+- **Center a headline or change a color:** edit the relevant CSS rule in `src/styles.css`. Change the page/component only if its content or structure also needs changing.
+- **Add a filter:** add its control in `FindCarePage.tsx`, its field in `types.ts`, and its default and matching logic in `clinicService.ts`. Update the active-filter count, Clear all behavior, translations, and mock data as needed.
+- **Add a page:** create it under `src/pages/`, register its route in `App.tsx`, and add a link in `Layout.tsx` if appropriate.
+- **Connect real clinic data later:** implement the `ClinicDataService` interface with API calls while keeping the existing pages and components using that shared service.
+
+### Supporting files and editing workflow
+
+- `src/main.tsx` starts the React application; `index.html` supplies the browser document and root element.
+- `package.json` defines npm commands and dependencies; `package-lock.json` records resolved dependency versions and is maintained by npm.
+- `vite.config.ts` configures development/build tooling and local ports; `tsconfig*.json` configures TypeScript.
+- `vercel.json` and `public/_redirects` support direct navigation to application routes on hosting platforms.
+- `scripts/smoke-test.mjs` checks routes, assets, and application logic. `scripts/serve-dist.mjs` previews built files; it is not an application backend.
+
+Edit source files, **not `dist/` or `node_modules/`**. `dist/` is regenerated by the production build; `node_modules/` contains installed third-party packages. Use `npm run dev` while editing, `npm run typecheck` for TypeScript validation, and `npm test` for the build and smoke checks when changing behavior. See the development-versus-production section above for preview and deployment commands.
 
 ## Project structure
 
@@ -117,22 +184,28 @@ mediq/
 │   │   ├── Brand.tsx           # Logo and wordmark
 │   │   ├── ClinicComponents.tsx# Clinic cards, map, stages, historical chart
 │   │   ├── Layout.tsx          # Header, footer, language, mobile nav, toasts
+│   │   ├── ProductTour.tsx     # Replayable interface introduction
+│   │   ├── QuickReport.tsx     # Current/recent visit reporting dialog
 │   │   └── UI.tsx              # Demo, confidence, safety, and loading UI
 │   ├── context/
-│   │   └── AppContext.tsx      # Guest persistence and shared app actions
+│   │   ├── AppContext.tsx      # Guest persistence and shared app actions
+│   │   └── interfaceTranslations.ts # Expanded interface translations
 │   ├── data/
 │   │   └── mockData.ts         # All fictional clinics, providers, waits, and reviews
 │   ├── pages/
 │   │   ├── ClinicPage.tsx
+│   │   ├── ContactPage.tsx
 │   │   ├── FindCarePage.tsx
 │   │   ├── KnowPage.tsx
 │   │   ├── OnboardingPage.tsx
 │   │   ├── ReportPage.tsx
 │   │   └── SavedPage.tsx
 │   ├── services/
-│   │   └── clinicService.ts    # Typed async data adapter and production swap point
+│   │   ├── clinicService.ts    # Typed async data adapter and production swap point
+│   │   └── locationService.ts  # Optional approximate browser location
 │   ├── utils/
 │   │   ├── navigation.tsx      # Lightweight History API router
+│   │   ├── report.ts          # Shared report drafts and validation
 │   │   └── time.ts             # Date and visit-plan calculations
 │   ├── App.tsx
 │   ├── main.tsx
