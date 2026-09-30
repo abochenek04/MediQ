@@ -1,0 +1,39 @@
+# Import deliberately as a new staging Blueprint. Never attach the public service here.
+services:
+  - type: web
+    name: mediq-staging
+    runtime: node
+    plan: starter
+    autoDeployTrigger: off
+    buildCommand: npm ci && VITE_DATA_MODE=backend VITE_APP_ENV=staging npm run build:staging
+    startCommand: npm run api
+    healthCheckPath: /api/health
+    disk:
+      name: mediq-staging-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: APP_ENV
+        value: staging
+      - key: DATABASE_PATH
+        value: /var/data/mediq.sqlite
+      - key: HOST
+        value: 0.0.0.0
+      - key: SERVE_STATIC
+        value: "true"
+      - key: RUN_JOBS
+        value: "true"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: MAIL_MODE
+        value: resend
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: APP_ORIGIN
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false

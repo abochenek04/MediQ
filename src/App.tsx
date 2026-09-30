@@ -1,4 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
+import { AccountPage } from './pages/AccountPage';
+import { SettingsPage } from './pages/SettingsPage';
+import { PageLoader } from './components/UI';
 import { Layout } from './components/Layout';
 import { AppProvider, useApp } from './context/AppContext';
 import { ContactPage } from './pages/ContactPage';
@@ -10,29 +13,34 @@ import { ReportPage } from './pages/ReportPage';
 import { SavedPage } from './pages/SavedPage';
 import { Link, useLocationPath } from './utils/navigation';
 
+const AdminPage = (import.meta.env.VITE_APP_ENV === 'staging' || import.meta.env.VITE_APP_ENV === 'development') ? lazy(() => import('./pages/AdminPage')) : null;
+
 const pageTitle = (path: string) => {
-  if (path === '/') return 'MediQ — Know before you go';
-  if (path === '/find') return 'Find care — MediQ';
-  if (path.startsWith('/clinic/')) return 'Clinic details — MediQ';
-  if (path === '/saved') return 'Appointments — MediQ';
-  if (path === '/report') return 'Report your visit — MediQ';
-  if (path === '/know') return 'About — MediQ';
-  if (path === '/contact') return 'Contact Us — MediQ';
-  return 'Page not found — MediQ';
+  if (path.startsWith('/clinic/')) return 'Clinic details';
+  return ({'/':'heroTitle','/find':'Find care','/saved':'Appointments','/report':'Report your visit','/know':'About','/contact':'Contact Us','/login':'Sign in','/signup':'Create a free account','/verify':'Verify your email','/reset-password':'Reset password','/settings':'Settings','/admin':'Administration'} as Record<string,string>)[path] || 'Page not found';
 };
 
 function AppRoutes() {
-  const { t } = useApp();
+  const { t, accountReady, accountError, refreshAccount, user } = useApp();
   const location = useLocationPath();
 
   useEffect(() => {
-    document.title = pageTitle(location.pathname);
-  }, [location.pathname]);
+    document.title = `${t(pageTitle(location.pathname))} — MediQ`;
+    const skip = document.querySelector('.skip-link'); if (skip) skip.textContent = t('Skip to main content');
+  }, [location.pathname, t]);
+
+  if (!accountReady) return <div className="shell page-space">{accountError ? <div role="alert"><p>{t(accountError)}</p><button className="button button-primary" onClick={() => void refreshAccount()}>{t('Try again')}</button></div> : <PageLoader label="Restoring your session" />}</div>;
 
   if (location.pathname === '/') return <OnboardingPage />;
 
   let page: React.ReactNode;
-  if (location.pathname === '/find') page = <FindCarePage />;
+  if (location.pathname === '/login') page = <AccountPage key="login" mode="login" />;
+  else if (location.pathname === '/signup') page = <AccountPage key="signup" mode="signup" />;
+  else if (location.pathname === '/verify') page = <AccountPage key="verify" mode="verify" />;
+  else if (location.pathname === '/reset-password') page = <AccountPage key="reset" mode="reset" />;
+  else if (location.pathname === '/settings') page = <SettingsPage key={user?.id || 'guest'} />;
+  else if (location.pathname === '/admin' && AdminPage) page = <Suspense fallback={<PageLoader />}><AdminPage /></Suspense>;
+  else if (location.pathname === '/find') page = <FindCarePage />;
   else if (location.pathname === '/saved') page = <SavedPage />;
   else if (location.pathname === '/report') page = <ReportPage />;
   else if (location.pathname === '/contact') page = <ContactPage />;

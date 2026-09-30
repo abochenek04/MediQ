@@ -15,6 +15,7 @@ import {
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { DemoBadge, InfoNote, SafetyNote } from '../components/UI';
 import { useApp } from '../context/AppContext';
+import { backendEnabled } from '../services/api';
 import { clinicService } from '../services/clinicService';
 import type { Clinic, VisitMode, WaitReportDraft } from '../types';
 import { Link } from '../utils/navigation';
@@ -25,25 +26,30 @@ export function ReportPage() {
   const { submitReport, t } = useApp();
   const today = localToday();
   const queryClinicId = new URLSearchParams(window.location.search).get('clinic') || '';
+  const [loadError, setLoadError] = useState(false);
+  const [retry, setRetry] = useState(0);
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [draft, setDraft] = useState<WaitReportDraft>(() => initialDraft(queryClinicId));
   const [durationMode, setDurationMode] = useState<'exact' | 'range'>('exact');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [confirmation, setConfirmation] = useState<{ totalMinutes: number; clinicId: string } | null>(null);
+  const [confirmation, setConfirmation] = useState<{ totalMinutes: number; clinicId: string; review?: boolean } | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let active = true; setLoadError(false);
     void clinicService.searchClinics({
       query: '', insurance: '', specialty: '', language: '', minimumRating: 0, visitMode: 'all', timing: 'all', maxDistance: 25,
     }).then((items) => {
+      if (!active) return;
       setClinics(items);
       const selected = items.find((clinic) => clinic.id === queryClinicId);
       if (selected && !selected.visitModes.includes(draft.visitMode)) {
         setDraft((current) => ({ ...current, visitMode: selected.visitModes[0] }));
       }
-    });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, () => { if (active) setLoadError(true); });
+    return () => { active = false; };
+  }, [retry]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedClinic = clinics.find((clinic) => clinic.id === draft.clinicId);
 
@@ -69,6 +75,7 @@ export function ReportPage() {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (submitting) return;
     const nextErrors = validateReport(draft, durationMode);
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
@@ -81,7 +88,7 @@ export function ReportPage() {
       : { ...draft, totalRange: '' };
     try {
       const result = await submitReport(payload);
-      setConfirmation({ totalMinutes: result.totalMinutes, clinicId: result.clinicId });
+      setConfirmation({ totalMinutes: result.totalMinutes, clinicId: result.clinicId, review: result.moderationStatus === 'review' });
     } catch {
       setErrors({ submit: 'Your report could not be saved. Please try again.' });
       window.setTimeout(() => errorRef.current?.focus(), 0);
@@ -102,7 +109,7 @@ export function ReportPage() {
         <div className="shell report-shell">
           <section className="report-confirmation">
             <div className="confirmation-mark"><Check aria-hidden="true" /></div>
-            <DemoBadge label={t("Sample report added")} />
+            <DemoBadge label={t(confirmation.review ? 'Report received for review.' : backendEnabled ? 'Report accepted. Thank you.' : 'Sample report added')} />
             <h1>{t("That’s one more useful signal.")}</h1>
             <p>
               {t('Report saved for {clinic}: {minutes} minutes.', { clinic: clinic?.name || '', minutes: confirmation.totalMinutes })}
@@ -136,6 +143,7 @@ export function ReportPage() {
           <div className="report-time-badge"><Timer aria-hidden="true" /><span><strong>{t("≈ 1 minute")}</strong><small>{t("7 quick answers")}</small></span></div>
         </div>
 
+        {loadError && <p role="alert">{t('The service is unavailable. Please try again.')} <button className="button button-secondary" onClick={() => setRetry(n => n + 1)}>{t('Try again')}</button></p>}
         <div className="journey-strip" aria-label={t('Visit stages')}>
           {['Check in', 'Wait', 'Care', 'Check out'].map((stage, index) => <span key={stage}><b>{index + 1}</b>{t(stage)}</span>)}
         </div>
@@ -190,7 +198,7 @@ export function ReportPage() {
                 <div><h2 id="visit-time-title">{t("How long did it take?")}</h2><p>{t("Check in → Wait → Care → Check out. Approximate times are fine.")}</p></div>
                 <span>{t("Required")}</span>
               </div>
-              <div className="duration-mode-toggle" aria-label="How to report visit duration">
+              <div className="duration-mode-toggle" aria-label={t('How to report visit duration')}>
                 <button type="button" className={durationMode === 'exact' ? 'active' : ''} onClick={() => setDurationMode('exact')} aria-pressed={durationMode === 'exact'}>{t("I know the times")}</button>
                 <button type="button" className={durationMode === 'range' ? 'active' : ''} onClick={() => setDurationMode('range')} aria-pressed={durationMode === 'range'}>{t("Use a total range")}</button>
               </div>
@@ -291,14 +299,14 @@ export function ReportPage() {
                 <input type="checkbox" checked={draft.anonymous} onChange={(event) => updateDraft('anonymous', event.target.checked)} />
                 <i aria-hidden="true" />
               </label>
-              <InfoNote> {t("Reports stay in this browser. Do not include personal or medical details.")} </InfoNote>
+              <InfoNote> {t("In backend mode, accepted reports are shared and retained independently of guest state. Do not include personal or medical details.")} </InfoNote>
             </div>
           </section>
 
           <div className="report-submit-row">
             <div><UserRoundCheck aria-hidden="true" /><span><strong>{t("Ready to help the next patient?")}</strong><small>{t("You can review every answer before submitting.")}</small></span></div>
             <button className="button button-coral button-large" type="submit" disabled={submitting}>
-              {submitting ? t("Checking report…") : t("Submit sample report")} <ArrowRight aria-hidden="true" />
+              {submitting ? t("Checking report…") : t(backendEnabled ? 'Submit report' : 'Submit sample report')} <ArrowRight aria-hidden="true" />
             </button>
           </div>
         </form>

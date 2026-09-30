@@ -28,8 +28,8 @@ export function KnowPage() {
     </section>
     <section id="reliability" className="about-section"><span className="eyebrow">04</span><h2>{t('Reliability')}</h2><p>{t('Confidence describes the timing evidence: how recent, plentiful, consistent, and varied the reports are. It is separate from a clinic’s star rating and does not measure medical quality or guarantee a finish time.')}</p>
       <p id="limitations">{t('Urgent cases, staffing changes, and different patient needs can change visit times. Confirm hours, insurance, and bookings directly with the clinic.')}</p>
-      <details id="privacy"><summary>{t('Privacy and demo limitations')}</summary><p>{t('Saved visits, preferences, and reports stay in this browser. Location is optional and is not saved. Do not enter medical or identifying details. There is no live booking, email, Google rating, or clinic connection.')}</p></details>
-      <details id="access"><summary>{t('Guest access and future accounts')}</summary><p>{t('All prototype tools are available as a guest. Account sync and any optional Plus features remain future concepts; no pricing or paid service is offered here.')}</p></details>
+      <details id="privacy"><summary>{t('Privacy and demo limitations')}</summary><p>{t('Guests use temporary in-memory preferences and plans. Verified accounts use private server storage. Shared reports omit names and notes; anti-abuse identifiers expire after seven days. Optional profile fields stay private. Location is optional and is not saved.')}</p></details>
+      <details id="access"><summary>{t('Guests and verified accounts')}</summary><p>{t('Browse, plan and report as a guest. Verify an account to save across devices. Booking, ratings, travel routes and notifications require authorized integrations; none are claimed when unavailable.')}</p></details>
       <div id="safety"><SafetyNote /></div>
     </section>
   </div></div>;

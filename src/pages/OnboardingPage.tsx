@@ -18,18 +18,7 @@ import { Link, navigate } from '../utils/navigation';
 
 export function OnboardingPage() {
   const { t, pushToast } = useApp();
-  const [accountNoteOpen, setAccountNoteOpen] = useState(false);
-
-  const enterAsGuest = () => {
-    window.localStorage.setItem('mediq-onboarded', 'guest');
-    navigate('/find');
-  };
-
-  const enterAccountPreview = () => {
-    window.localStorage.setItem('mediq-onboarded', 'account-preview');
-    pushToast('Account features are simulated; you’re browsing privately on this device.', 'info');
-    navigate('/find');
-  };
+  const enterAsGuest = () => navigate('/find');
 
   return (
     <main id="main-content" className="onboarding-page">
@@ -46,7 +35,7 @@ export function OnboardingPage() {
           <p> {t("See how long a visit may take, how reliable that estimate is, and when to leave—before your day gets away from you.")} </p>
         </div>
 
-        <div className="preview-card" aria-label="Example MediQ visit estimate">
+        <div className="preview-card" aria-label={t('Example MediQ visit estimate')}>
           <div className="preview-card-header">
             <span><MapPin aria-hidden="true" /> Durham, NC</span>
             <span className="status status-open"><span /> {t("Open now")}</span>
@@ -87,7 +76,7 @@ export function OnboardingPage() {
               <div className="entry-icon"><Clock3 aria-hidden="true" /></div>
               <div>
                 <h3>{t("Continue as a guest")}</h3>
-                <p>{t("Search clinics, compare estimates, save visits on this device, and report a wait anonymously.")}</p>
+                <p>{t("Browse and plan as a guest. Guest changes reset when you reload or close the tab.")}</p>
                 <ul>
                   <li><Check aria-hidden="true" /> {t("No sign-up")}</li>
                   <li><Check aria-hidden="true" /> {t("No health information")}</li>
@@ -102,17 +91,9 @@ export function OnboardingPage() {
               <div className="entry-icon soft"><UserRound aria-hidden="true" /></div>
               <div>
                 <h3>{t("Create a free account")}</h3>
-                <p>{t("Future accounts will sync saved clinics, appointments, and language preferences across devices.")}</p>
+                <p>{t("Verified accounts sync saved clinics, visit plans and preferences across devices.")}</p>
               </div>
-              {accountNoteOpen ? (
-                <div className="integration-callout" role="status">
-                  <strong>{t("Authentication isn’t connected yet.")}</strong>
-                  <span>{t("This demo will preview account features without collecting personal or medical information.")}</span>
-                  <button className="button button-secondary" type="button" onClick={enterAccountPreview}> {t("Continue with preview")} </button>
-                </div>
-              ) : (
-                <button className="button button-secondary button-large" type="button" onClick={() => setAccountNoteOpen(true)}> {t("Preview free account")} </button>
-              )}
+              <Link className="button button-secondary button-large" to="/signup">{t('Sign up')}</Link>
             </article>
 
             <article className="entry-card plus-card">
@@ -131,7 +112,7 @@ export function OnboardingPage() {
 
           <div className="guest-capabilities">
             <Bookmark aria-hidden="true" />
-            <p><strong>{t("Guest-first by design.")}</strong> {t("Your saved items stay in this browser. Nothing here stores diagnoses, medications, or medical records.")}</p>
+            <p><strong>{t("Guest-first by design.")}</strong> {t("Guest changes are temporary. Account data is private and persistent. No medical history is needed to browse.")}</p>
           </div>
           <SafetyNote compact />
         </div>

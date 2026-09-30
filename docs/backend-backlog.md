@@ -1,68 +1,17 @@
-# Backend implementation backlog
+# Backend implementation status and launch backlog
 
-**Status:** Backlogged; implementation has not started.
-**Recorded:** September 23, 2026.
-**Next input:** The project owner's drafted next-version modifications, ideas, and feature requirements.
+The earlier provisional backlog has been implemented as a local/staging full-stack platform; this is no longer an account-preview/browser-storage prototype. The retained React UI calls a Node/SQLite API with Better Auth verification and persistent owner-scoped storage. See [architecture/runbook](runbook.md), [data/estimates](data-and-estimates.md) and the [requirement checklist](upgrade-checklist.md).
 
-## Purpose
+Implemented: migrations, fictional development seed, verified signup/login/recovery/change/delete, sessions, private settings/plans/clinics, validated shared reports, dedupe/rate limits/review, recency/sample/outlier estimates, jobs, unavailable integration adapters, administrator role checks, account directory, metrics, audited corrections and editable persistent launch tasks. Demo mode remains explicit and guest customizations are temporary memory.
 
-Add a backend so MediQ can grow beyond a browser-local prototype: shared clinic information, persistent reports, cross-device plans, and eventual real data integrations. Extend the existing application and service interfaces rather than rebuilding the frontend.
+Remaining work requires owner/provider configuration or outside review:
 
-This document records the discussion for a future work session. The items below are candidates to refine against the owner's upcoming requirements, not a finalized implementation scope. No vendor, hosting provider, budget, or delivery date has been selected.
+- Create independent cloud staging and production services/disks/secrets. Validate actual sender-domain ownership and email delivery. No cloud project or public site was altered here.
+- Acquire licensed clinic/provider data and source refresh permissions. Existing records are fictional. Obtain permitted ratings, route and scheduling APIs before implementing a vendor-specific adapter or claiming availability/reservations.
+- Configure hosting domains/TLS, monitoring, job scheduling and encrypted off-host backups; test restores and document the real provider retention policy.
+- Arrange privacy/security, clinical-safety, accessibility and native-speaker review before a real-data pilot.
+- Establish private production operations/moderation access. Current web administrator tools are deliberately development/staging-only; production public assets and APIs expose no internal tools. Trusted operator maintenance requires a backup and recorded changes.
+- Consider managed PostgreSQL and multiple application instances when a single persistent-disk service no longer meets availability/scale needs. Do not promise zero-downtime disk-backed deploys.
+- Notifications require a consent-aware delivery provider; the preference and extension point do not send messages. Booking availability, confirmed reservations and cancellation workflows depend on clinic/vendor authorization. Contact remains an unsent demo.
 
-## Proposed work sequence
-
-| Phase | Candidate work | Outcome to verify |
-| --- | --- | --- |
-| 1. Requirements and design | Review the next-version draft; decide the first backend release, data sources, guest/account behavior, storage model, and hosting | An agreed scope and implementation plan |
-| 2. Shared clinic data | Create a database and API; seed the existing fictional clinics; connect search and clinic retrieval through the existing service adapter | Existing filters and clinic pages work with backend data while demo records stay labeled |
-| 3. Persistent reporting | Store current-wait and completed-visit reports; validate on the server; handle duplicate submissions, retries, and rate limits | Reports persist beyond one browser, and malformed or duplicate submissions are handled consistently |
-| 4. Accounts and saved plans | Add authentication and ownership rules; synchronize saved clinics and visit plans; decide how local guest data migrates | Users can access their own saved items across devices without exposing another user's data |
-| 5. Estimates and reliability | Define report eligibility, freshness, sample-size thresholds, source weighting, ranges, and confidence; add recalculation jobs as needed | Estimates are traceable to appropriate evidence and clearly disclose insufficient or stale data |
-| 6. External integrations | Add approved clinic, rating, travel, or scheduling sources individually; handle credentials, refreshes, failures, and source attribution | Each integration has a verified data source and a useful fallback |
-| 7. Operations and administration | Provide appropriate record correction/report review tools, monitoring, backups, and operational documentation | The backend can be maintained and problems can be investigated |
-
-Reorder or split these phases once the next-version requirements are available. Booking, notifications, and contact-message delivery are possible later features, not commitments for the first backend release.
-
-## Architecture candidates to evaluate
-
-- Keep the current React/TypeScript frontend.
-- Use PostgreSQL for persistent relational data.
-- Evaluate managed authentication and database hosting, including Supabase as one option.
-- Use a small TypeScript API or server-side functions for operations requiring trusted validation and integration credentials.
-- Add scheduled jobs when refreshing external data or recalculating estimates requires them.
-
-Database candidates include clinics, providers, reports, estimate history, user preferences, saved clinics, and visit plans. Final tables and relationships should follow the agreed requirements.
-
-## Existing integration points
-
-| Existing file | Role in future work |
-| --- | --- |
-| [clinicService.ts](../src/services/clinicService.ts) | Replace mock operations with API requests while retaining the `ClinicDataService` contract where practical |
-| [AppContext.tsx](../src/context/AppContext.tsx) | Coordinate shared state, authentication-aware actions, and the transition from browser-only persistence |
-| [types.ts](../src/types.ts) | Keep frontend and backend data contracts coherent |
-| [mockData.ts](../src/data/mockData.ts) | Reuse fictional fixtures for development and testing |
-| [report.ts](../src/utils/report.ts) | Reuse suitable validation rules; independently enforce validation on the server |
-| [locationService.ts](../src/services/locationService.ts) | Preserve optional browser permission and approximate-location handling |
-| [time.ts](../src/utils/time.ts) | Preserve and test visit-planning arithmetic |
-
-## Decisions to carry forward
-
-- Backend infrastructure does not itself supply real clinic data. Establish the source and permitted use of each dataset or integration.
-- Keep ongoing wait reports separate from completed total-visit reports. The current `reportKind` and `elapsedMinutes` fields already support this distinction.
-- Do not let a single report automatically become a clinic's advertised wait time; define the estimation rules first.
-- Preserve the Check in → Wait → Care → Check out experience model.
-- Keep saved visit plans distinct from confirmed clinic bookings until a real scheduling integration exists.
-- Preserve guest browsing, accessibility, translations, and mobile behavior.
-- Define what anonymous reporting means, what identifiers are retained, and who can view reports. Focus collection on necessary operational timing rather than medical histories.
-- Protect private user records through server/database access rules, and keep privileged credentials out of browser code.
-
-## When work resumes
-
-- [ ] Collect the owner's next-version draft.
-- [ ] Reconcile those requirements with this backlog and the current repository.
-- [ ] Identify the smallest useful first backend release and its acceptance criteria.
-- [ ] Select the architecture, providers, data sources, and guest-data migration approach.
-- [ ] Implement incrementally, verifying existing frontend workflows at each stage.
-
-Related context: [product background](product-background.md), [current verification notes](verification.md), and the repository README's API integration section.
+These are also specific editable records in the internal Launch checklist, with reasons, owner actions and verification criteria. They do not replace implemented local backend work with vague future tasks.

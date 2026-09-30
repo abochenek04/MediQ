@@ -1,237 +1,97 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
-import { interfaceTranslations } from './interfaceTranslations';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { sampleAppointment } from '../data/mockData';
-import { clinicService } from '../services/clinicService';
+import { clinicService, clearReportRequests } from '../services/clinicService';
+import { api, authRequest, backendEnabled, announceAccountChange, errorKey, setExpectedAccount } from '../services/api';
+import type { AccountState, AccountUser, PrivateProfile } from '../services/account';
+import { translate, supportedLanguages } from './translate';
 import type { AppToast, PatientReport, SavedAppointment, WaitReportDraft } from '../types';
-
-type ToastTone = AppToast['tone'];
-
 interface AppContextValue {
-  savedClinicIds: string[];
-  savedAppointments: SavedAppointment[];
-  submittedReports: PatientReport[];
-  language: string;
-  toasts: AppToast[];
-  toggleSavedClinic: (clinicId: string) => void;
-  saveAppointment: (appointment: SavedAppointment) => Promise<void>;
-  removeAppointment: (appointmentId: string) => void;
-  submitReport: (draft: WaitReportDraft) => Promise<PatientReport>;
-  setLanguage: (language: string) => void;
-  pushToast: (message: string, tone?: ToastTone) => void;
-  t: (key: string, values?: Record<string, string | number>) => string;
+ savedClinicIds:string[];savedAppointments:SavedAppointment[];submittedReports:PatientReport[];language:string;toasts:AppToast[];
+ user:AccountUser|null;profile:PrivateProfile|null;isAdmin:boolean;accountReady:boolean;accountError:string;
+ tourDone:boolean;finishTour:()=>void;
+ refreshAccount:()=>Promise<void>;logout:()=>Promise<void>;
+ toggleSavedClinic:(id:string)=>void;saveAppointment:(appointment:SavedAppointment)=>Promise<void>;removeAppointment:(id:string)=>void;
+ submitReport:(draft:WaitReportDraft)=>Promise<PatientReport>;setLanguage:(language:string)=>void;
+ pushToast:(message:string,tone?:AppToast['tone'])=>void;t:(key:string,values?:Record<string,string|number>)=>string;
 }
-
-type TranslationKey =
-  | 'findCare'
-  | 'saved'
-  | 'reportWait'
-  | 'howItWorks'
-  | 'language'
-  | 'heroEyebrow'
-  | 'heroTitle'
-  | 'heroBody'
-  | 'searchPlaceholder';
-
-const translations: Record<string, Record<TranslationKey, string>> = {
-  en: {
-    findCare: 'Find care',
-    saved: 'Appointments',
-    reportWait: 'Report wait',
-    howItWorks: 'About',
-    language: 'Language',
-    heroEyebrow: 'Care planning for real life',
-    heroTitle: 'Know before you go.',
-    heroBody: 'Compare total visit times, understand confidence, and make a plan that respects your day.',
-    searchPlaceholder: 'Clinic, provider, specialty, or symptom',
-  },
-  es: {
-    findCare: 'Buscar atención',
-    saved: 'Citas',
-    reportWait: 'Reportar espera',
-    howItWorks: 'Acerca de MediQ',
-    language: 'Idioma',
-    heroEyebrow: 'Planificación para la vida real',
-    heroTitle: 'Infórmate antes de ir.',
-    heroBody: 'Compara la duración de las visitas, comprende la confianza y planifica tu día.',
-    searchPlaceholder: 'Clínica, proveedor, especialidad o síntoma',
-  },
-  zh: {
-    findCare: '寻找医疗服务',
-    saved: '预约',
-    reportWait: '报告等待时间',
-    howItWorks: '关于',
-    language: '语言',
-    heroEyebrow: '贴近生活的就医规划',
-    heroTitle: '出发前，心中有数。',
-    heroBody: '比较就诊总时长，了解数据可信度，合理安排一天。',
-    searchPlaceholder: '诊所、医生、专科或症状',
-  },
-  ar: {
-    findCare: 'ابحث عن رعاية',
-    saved: 'المواعيد',
-    reportWait: 'الإبلاغ عن الانتظار',
-    howItWorks: 'حول MediQ',
-    language: 'اللغة',
-    heroEyebrow: 'تخطيط للرعاية يناسب حياتك',
-    heroTitle: 'اعرف قبل أن تذهب.',
-    heroBody: 'قارن مدة الزيارة وافهم موثوقية التقدير وخطط ليومك.',
-    searchPlaceholder: 'عيادة أو مقدم خدمة أو تخصص أو عرض',
-  },
-};
-
-const readStored = <T,>(key: string, fallback: T): T => {
-  try {
-    const stored = window.localStorage.getItem(key);
-    return stored ? (JSON.parse(stored) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-};
-
-const AppContext = createContext<AppContextValue | null>(null);
-
-export function AppProvider({ children }: { children: ReactNode }) {
-  const [savedClinicIds, setSavedClinicIds] = useState<string[]>(() =>
-    readStored('mediq-saved-clinics', []),
-  );
-  const [savedAppointments, setSavedAppointments] = useState<SavedAppointment[]>(() =>
-    readStored('mediq-appointments', [sampleAppointment]),
-  );
-  const [submittedReports, setSubmittedReports] = useState<PatientReport[]>(() =>
-    readStored('mediq-reports', []),
-  );
-  const [language, updateLanguage] = useState(() =>
-    ['en', 'es', 'zh', 'ar'].includes(window.localStorage.getItem('mediq-language') || '') ? window.localStorage.getItem('mediq-language')! : 'en',
-  );
-  const [toasts, setToasts] = useState<AppToast[]>([]);
-  const toastId = useRef(0);
-
-  useEffect(() => {
-    window.localStorage.setItem('mediq-saved-clinics', JSON.stringify(savedClinicIds));
-  }, [savedClinicIds]);
-
-  useEffect(() => {
-    window.localStorage.setItem('mediq-appointments', JSON.stringify(savedAppointments));
-  }, [savedAppointments]);
-
-  useEffect(() => {
-    window.localStorage.setItem('mediq-reports', JSON.stringify(submittedReports));
-  }, [submittedReports]);
-
-  useEffect(() => {
-    document.documentElement.lang = language;
-    document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
-  }, [language]);
-
-  const t = useCallback((key: string, values?: Record<string, string | number>) => {
-    const locale = translations[language] || translations.en;
-    const column = ['es', 'zh', 'ar'].indexOf(language);
-    let text = locale[key as TranslationKey] || (column >= 0 ? interfaceTranslations[key]?.[column] : undefined) || key;
-    for (const [name, value] of Object.entries(values || {})) text = text.replaceAll(`{${name}}`, String(value));
-    return text;
-  }, [language]);
-
-  const pushToast = useCallback((message: string, tone: ToastTone = 'default') => {
-    const id = ++toastId.current;
-    setToasts((current) => [...current, { id, message, tone }]);
-    window.setTimeout(() => {
-      setToasts((current) => current.filter((toast) => toast.id !== id));
-    }, 4200);
-  }, []);
-
-  const toggleSavedClinic = useCallback(
-    (clinicId: string) => {
-      const isSaved = savedClinicIds.includes(clinicId);
-      setSavedClinicIds(current => isSaved ? current.filter(id => id !== clinicId) : [...current, clinicId]);
-      pushToast(t(isSaved ? 'Clinic removed from saved care.' : 'Clinic saved for later.'), isSaved ? 'default' : 'success');
-    },
-    [pushToast, t, savedClinicIds],
-  );
-
-  const saveAppointment = useCallback(
-    async (appointment: SavedAppointment) => {
-      const saved = await clinicService.saveAppointment(appointment);
-      setSavedAppointments((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
-      pushToast(t('Visit saved. Your planning window is ready.'), 'success');
-    },
-    [pushToast, t],
-  );
-
-  const removeAppointment = useCallback(
-    (appointmentId: string) => {
-      setSavedAppointments((current) => current.filter((item) => item.id !== appointmentId));
-      pushToast(t('Saved visit removed.'));
-    },
-    [pushToast, t],
-  );
-
-  const submitReport = useCallback(
-    async (draft: WaitReportDraft) => {
-      const result = await clinicService.submitWaitReport(draft);
-      setSubmittedReports((current) => [result, ...current]);
-      pushToast(t('Thank you—your sample report was added.'), 'success');
-      return result;
-    },
-    [pushToast, t],
-  );
-
-  const setLanguage = useCallback(
-    (nextLanguage: string) => {
-      updateLanguage(nextLanguage);
-      window.localStorage.setItem('mediq-language', nextLanguage);
-      document.documentElement.lang = nextLanguage;
-      document.documentElement.dir = nextLanguage === 'ar' ? 'rtl' : 'ltr';
-      const column = ['es', 'zh', 'ar'].indexOf(nextLanguage);
-      pushToast(column < 0 ? 'Language preference saved.' : interfaceTranslations['Language preference saved.'][column], 'info');
-    },
-    [pushToast, t],
-  );
-
-  const value = useMemo<AppContextValue>(
-    () => ({
-      savedClinicIds,
-      savedAppointments,
-      submittedReports,
-      language,
-      toasts,
-      toggleSavedClinic,
-      saveAppointment,
-      removeAppointment,
-      submitReport,
-      setLanguage,
-      pushToast,
-      t,
-    }),
-    [
-      savedClinicIds,
-      savedAppointments,
-      submittedReports,
-      language,
-      toasts,
-      toggleSavedClinic,
-      saveAppointment,
-      removeAppointment,
-      submitReport,
-      setLanguage,
-      pushToast,
-      t,
-    ],
-  );
-
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+const AppContext=createContext<AppContextValue|null>(null);
+const guestPlans=()=>[{...sampleAppointment}];
+export function AppProvider({children}:{children:ReactNode}) {
+ const [savedClinicIds,setSavedClinicIds]=useState<string[]>([]);
+ const [savedAppointments,setSavedAppointments]=useState<SavedAppointment[]>(guestPlans);
+ const [submittedReports,setSubmittedReports]=useState<PatientReport[]>([]);
+ const [language,updateLanguage]=useState('en');
+ const [toasts,setToasts]=useState<AppToast[]>([]);
+ const [user,setUser]=useState<AccountUser|null>(null);
+ const [profile,setProfile]=useState<PrivateProfile|null>(null);
+ const [isAdmin,setIsAdmin]=useState(false);
+ const [accountReady,setAccountReady]=useState(!backendEnabled);
+ const [accountError,setAccountError]=useState('');
+ const [tourDone,setTourDone]=useState(false);
+ const dataRevision=useRef(0);const generation=useRef(0);const restoreRequest=useRef(0);const owner=useRef<string|null>(null);const toastId=useRef(0);
+ const savedRef=useRef(savedClinicIds);savedRef.current=savedClinicIds;
+ const busy=useRef(new Set<string>());
+ const t=useCallback((key:string,values?:Record<string,string|number>)=>translate(language,key,values),[language]);
+ const pushToast=useCallback((message:string,tone:AppToast['tone']='default')=>{const id=++toastId.current;setToasts(current=>[...current,{id,message,tone}]);window.setTimeout(()=>setToasts(current=>current.filter(item=>item.id!==id)),5000);},[]);
+ const clearPrivate=useCallback(()=>{generation.current++;clearReportRequests();busy.current.clear();owner.current=null;setExpectedAccount(null);setUser(null);setProfile(null);setIsAdmin(false);setSavedClinicIds([]);setSavedAppointments(guestPlans());setSubmittedReports([]);setToasts([]);updateLanguage('en');setTourDone(false);},[]);
+ const refreshAccount=useCallback(async()=>{
+  if(!backendEnabled)return;
+  const request=++restoreRequest.current;const revision=dataRevision.current;
+  try{
+   const state=await api<AccountState>('/me');if(request!==restoreRequest.current)return;
+   const identityChanged=state.user?.id!==owner.current && !(state.user===null&&owner.current===null);
+   if(identityChanged)clearPrivate();
+   owner.current=state.user?.id||null;setExpectedAccount(owner.current);setUser(state.user);setIsAdmin(state.admin);
+   if(identityChanged||revision===dataRevision.current)setProfile(state.profile||null);
+   if(state.user&&(identityChanged||revision===dataRevision.current)){setSavedClinicIds(state.savedClinicIds||[]);setSavedAppointments(state.savedAppointments||[]);updateLanguage(state.profile?.language||'en');}
+   setAccountError('');setAccountReady(true);
+  }catch(error){if(request===restoreRequest.current){setAccountError(errorKey(error));setAccountReady(false);}}
+ },[clearPrivate]);
+ useEffect(()=>{
+  // Only legacy MediQ keys; never clear unrelated browser storage.
+  try{for(const key of ['mediq-saved-clinics','mediq-appointments','mediq-reports','mediq-language','mediq-tour-v1','mediq-onboarded'])localStorage.removeItem(key);}catch{/* Storage may be disabled. */}
+  void refreshAccount();
+  const changed=()=>{restoreRequest.current++;clearPrivate();setAccountReady(!backendEnabled);void refreshAccount();};
+  const focused=()=>{if(document.visibilityState==='visible')void refreshAccount();};
+  const storage=(e:StorageEvent)=>{if(e.key==='mediq-account-signal'&&e.newValue)changed();};
+  let channel:BroadcastChannel|undefined;try{channel=new BroadcastChannel('mediq-account');channel.onmessage=changed;}catch{/* Storage/focus/poll provide fallback. */}
+  window.addEventListener('mediq:account-change',changed);window.addEventListener('mediq:session-expired',changed);window.addEventListener('storage',storage);window.addEventListener('focus',focused);
+  const timer=window.setInterval(focused,30000);
+  return()=>{restoreRequest.current++;generation.current++;channel?.close();clearInterval(timer);window.removeEventListener('mediq:account-change',changed);window.removeEventListener('mediq:session-expired',changed);window.removeEventListener('storage',storage);window.removeEventListener('focus',focused);};
+ },[refreshAccount,clearPrivate]);
+ useEffect(()=>{document.documentElement.lang=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';},[language]);
+ useEffect(()=>{
+  if(!backendEnabled||!accountReady)return;
+  let activeAt=Date.now();const active=()=>{activeAt=Date.now();};
+  const heartbeat=()=>{if(document.visibilityState==='visible'&&Date.now()-activeAt<5*60000)void api('/presence','POST').catch(()=>{});};
+  window.addEventListener('pointerdown',active);window.addEventListener('keydown',active);heartbeat();const timer=window.setInterval(heartbeat,60000);
+  return()=>{clearInterval(timer);window.removeEventListener('pointerdown',active);window.removeEventListener('keydown',active);};
+ },[accountReady,user?.id]);
+ const logout=useCallback(async()=>{restoreRequest.current++;clearPrivate();setAccountReady(false);try{await authRequest('/sign-out');announceAccountChange();}catch(error){pushToast(t(errorKey(error)),'info');await refreshAccount();}},[clearPrivate,refreshAccount,pushToast,t]);
+ const toggleSavedClinic=useCallback((id:string)=>{
+  if(busy.current.has(`clinic:${id}`)||!accountReady)return;const epoch=generation.current;const wasSaved=savedRef.current.includes(id);busy.current.add(`clinic:${id}`);
+  void(async()=>{try{if(owner.current)await api(`/saved-clinics/${encodeURIComponent(id)}`,wasSaved?'DELETE':'PUT');if(epoch!==generation.current)return;dataRevision.current++;setSavedClinicIds(current=>wasSaved?current.filter(value=>value!==id):[...new Set([...current,id])]);pushToast(t(wasSaved?'Clinic removed from saved care.':'Clinic saved for later.'),'success');}catch(error){if(epoch===generation.current)pushToast(t(errorKey(error)),'info');}finally{busy.current.delete(`clinic:${id}`);}})();
+ },[accountReady,pushToast,t]);
+ const saveAppointment=useCallback(async(appointment:SavedAppointment)=>{
+  const epoch=generation.current;if(!accountReady||busy.current.has(`plan:${appointment.id}`))throw new Error('BUSY');busy.current.add(`plan:${appointment.id}`);
+  try{const saved=owner.current?await clinicService.saveAppointment(appointment):appointment;if(epoch!==generation.current)throw new Error('ACCOUNT_CHANGED');dataRevision.current++;setSavedAppointments(current=>[saved,...current.filter(p=>p.id!==saved.id)]);pushToast(t('Visit saved. Your planning window is ready.'),'success');}finally{busy.current.delete(`plan:${appointment.id}`);}
+ },[accountReady,pushToast,t]);
+ const removeAppointment=useCallback((id:string)=>{
+  const epoch=generation.current;if(!accountReady||busy.current.has(`plan:${id}`))return;busy.current.add(`plan:${id}`);
+  void(async()=>{try{if(owner.current)await api(`/plans/${encodeURIComponent(id)}`,'DELETE');if(epoch!==generation.current)return;dataRevision.current++;setSavedAppointments(current=>current.filter(p=>p.id!==id));pushToast(t('Saved visit removed.'));}catch(error){if(epoch===generation.current)pushToast(t(errorKey(error)),'info');}finally{busy.current.delete(`plan:${id}`);}})();
+ },[accountReady,pushToast,t]);
+ const submitReport=useCallback(async(draft:WaitReportDraft)=>{
+  const epoch=generation.current;const result=await clinicService.submitWaitReport(draft);if(epoch!==generation.current)throw new Error('ACCOUNT_CHANGED');
+  if(result.moderationStatus!=='review')setSubmittedReports(current=>[result,...current.filter(r=>r.id!==result.id)]);
+  pushToast(t(result.moderationStatus==='review'?'Report received for review.':backendEnabled?'Report accepted. Thank you.':'Thank you—your sample report was added.'),'success');return result;
+ },[pushToast,t]);
+ const setLanguage=useCallback((next:string)=>{
+  if(!(supportedLanguages as readonly string[]).includes(next))return;const epoch=generation.current;
+  if(!owner.current){updateLanguage(next);return;}
+  void api('/preferences','PUT',{language:next}).then(()=>{if(epoch===generation.current){dataRevision.current++;updateLanguage(next);setProfile(current=>current?{...current,language:next}:null);}},error=>{if(epoch===generation.current)pushToast(t(errorKey(error)),'info');});
+ },[pushToast,t]);
+ const finishTour=useCallback(()=>setTourDone(true),[]);
+ const value=useMemo(()=>({savedClinicIds,savedAppointments,submittedReports,language,toasts,user,profile,isAdmin,accountReady,accountError,tourDone,finishTour,refreshAccount,logout,toggleSavedClinic,saveAppointment,removeAppointment,submitReport,setLanguage,pushToast,t}),[savedClinicIds,savedAppointments,submittedReports,language,toasts,user,profile,isAdmin,accountReady,accountError,tourDone,finishTour,refreshAccount,logout,toggleSavedClinic,saveAppointment,removeAppointment,submitReport,setLanguage,pushToast,t]);
+ return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
-
-export const useApp = () => {
-  const context = useContext(AppContext);
-  if (!context) throw new Error('useApp must be used within AppProvider');
-  return context;
-};
+export const useApp=()=>{const context=useContext(AppContext);if(!context)throw new Error('useApp must be used within AppProvider');return context;};

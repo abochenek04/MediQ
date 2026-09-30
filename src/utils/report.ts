@@ -5,7 +5,7 @@ export const localToday = () => {
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 };
 export const initialDraft = (clinicId = ''): WaitReportDraft => ({
-  clinicId, visitMode: 'scheduled', visitDate: localToday(), arrivalTime: '', checkInTime: '',
+  timezoneOffsetMinutes: new Date().getTimezoneOffset(), clinicId, visitMode: 'scheduled', visitDate: localToday(), arrivalTime: '', checkInTime: '',
   providerTime: '', departureTime: '', totalRange: '', accuracy: '', communication: 0,
   rushed: '', note: '', anonymous: true,
 });

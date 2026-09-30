@@ -15,11 +15,12 @@ export const formatDateTime = (iso: string) => `${formatDate(iso)} · ${formatTi
 export const relativeReportTime = (iso: string) => {
   const difference = Math.max(0, Date.now() - new Date(iso).getTime());
   const minutes = Math.round(difference / 60000);
-  if (minutes < 60) return `${Math.max(minutes, 1)} min ago`;
+  const locale = typeof document === 'undefined' ? 'en' : document.documentElement.lang || 'en';
+  const format = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+  if (minutes < 60) return format.format(-Math.max(minutes, 1), 'minute');
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} hr${hours === 1 ? '' : 's'} ago`;
-  const days = Math.round(hours / 24);
-  return `${days} day${days === 1 ? '' : 's'} ago`;
+  if (hours < 24) return format.format(-hours, 'hour');
+  return format.format(-Math.round(hours / 24), 'day');
 };
 
 export const getVisitPlan = (appointment: SavedAppointment, clinic: Clinic) => {

@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
+import { backendEnabled } from '../services/api';
 import { useApp } from '../context/AppContext';
 import type { Clinic, VisitMode } from '../types';
 import { initialDraft, reportRanges, validateReport } from '../utils/report';
@@ -12,20 +13,23 @@ export function QuickReport({ clinic, mode, onClose }: { clinic: Clinic; mode: V
   const [minutes, setMinutes] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [review, setReview] = useState(false);
+  const lock = useRef(false);
   const [done, setDone] = useState(false);
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const payload = { ...draft, reportKind: kind === 'current' ? 'current-wait' as const : 'completed-visit' as const, elapsedMinutes: minutes === '' ? NaN : Number(minutes) };
+    if (lock.current) return;
+    const payload = { ...draft, reportKind: kind === 'current' ? 'current-wait' as const : 'completed-visit' as const, elapsedMinutes: kind === 'current' ? (minutes === '' ? NaN : Number(minutes)) : undefined };
     const errors = validateReport(payload, kind, false);
     if (Object.keys(errors).length) { setError(Object.values(errors)[0]); return; }
-    setBusy(true); setError('');
-    try { await submitReport(payload); setDone(true); }
+    lock.current = true; setBusy(true); setError('');
+    try { const result = await submitReport(payload); setReview(result.moderationStatus === 'review'); setDone(true); }
     catch { setError('Your report could not be saved. Please try again.'); }
-    finally { setBusy(false); }
+    finally { lock.current = false; setBusy(false); }
   };
-  return <Modal title={t(done ? 'Sample report added' : 'Report a wait')} onClose={onClose}>
+  return <Modal title={t(done ? (review ? 'Report received for review.' : backendEnabled ? 'Report accepted. Thank you.' : 'Sample report added') : 'Report a wait')} onClose={onClose}>
     {done ? <div className="quick-confirmation" role="status">
-      <p>{t('Thank you. Your report is saved on this device and appears in the clinic feed.')}</p>
+      <p>{t(review ? 'Your report needs review before it appears publicly.' : backendEnabled ? 'Accepted reports remain shared when your guest session resets.' : 'This sample report lasts for the current page session.')}</p>
       <p>{kind === 'current' && t('An ongoing wait is kept separate from completed visit totals.')}</p>
       <button className="button button-primary button-full" onClick={onClose}>{t('Back to Find Care')}</button>
     </div> : <form onSubmit={submit} noValidate>
@@ -44,7 +48,7 @@ export function QuickReport({ clinic, mode, onClose }: { clinic: Clinic; mode: V
       <p className="field-hint">{t('For today’s visit. Use the full report for earlier visits or detailed times.')}</p>
       <label className="checkbox-line"><input type="checkbox" checked={draft.anonymous} onChange={e => setDraft({ ...draft, anonymous: e.target.checked })} />{t('Submit anonymously')}</label>
       {error && <p className="field-error" role="alert">{t(error)}</p>}
-      <button disabled={busy} className="button button-primary button-full" type="submit">{t(busy ? 'Checking report…' : 'Submit sample report')}</button>
+      <button disabled={busy} className="button button-primary button-full" type="submit">{t(busy ? 'Checking report…' : backendEnabled ? 'Submit report' : 'Submit sample report')}</button>
       <div className="modal-actions"><button className="text-button" type="button" onClick={onClose}>{t('Cancel')}</button><Link to={`/report?clinic=${clinic.id}`}>{t('Open full report')}</Link></div>
     </form>}
   </Modal>;

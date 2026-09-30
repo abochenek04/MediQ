@@ -1,3 +1,6 @@
+import { api, backendEnabled, ApiError } from './api';
+import { searchDirectory } from './search';
+export { distanceMiles } from './search';
 import { validateReport } from '../utils/report';
 import { clinics } from '../data/mockData';
 import type {
@@ -29,17 +32,6 @@ export const defaultSearchFilters: SearchFilters = {
   visitMode: 'all', timing: 'all', maxDistance: 10,
 };
 
-// Straight-line distance to fictional coordinates. No routing or live clinic discovery.
-export const distanceMiles = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => {
-  const rad = Math.PI / 180;
-  const dLat = (b.latitude - a.latitude) * rad;
-  const dLon = (b.longitude - a.longitude) * rad;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.latitude * rad) * Math.cos(b.latitude * rad) * Math.sin(dLon / 2) ** 2;
-  return 3958.8 * 2 * Math.asin(Math.sqrt(Math.min(1, h)));
-};
-
-const normalize = (value: string) => value.trim().toLocaleLowerCase();
-
 const getMinutesBetween = (start: string, end: string) => {
   if (!start || !end) return 0;
   const [startHour, startMinute] = start.split(':').map(Number);
@@ -58,47 +50,7 @@ const rangeMidpoint = (range: string) => {
 export const mockClinicService: ClinicDataService = {
   async searchClinics(filters) {
     await delay();
-    const query = normalize(filters.query);
-
-    return clinics
-      .map((clinic) => filters.origin ? { ...clinic, distanceMiles: distanceMiles(filters.origin, clinic.coordinates) } : clinic)
-      .filter((clinic) => {
-        const searchText = normalize(
-          [
-            clinic.name,
-            clinic.type,
-            clinic.neighborhood,
-            clinic.address,
-            ...clinic.specialties,
-            ...clinic.symptoms,
-            ...clinic.providers.map((provider) => provider.name),
-          ].join(' '),
-        );
-
-        return (
-          (!query || searchText.includes(query)) &&
-          (!filters.insurance || clinic.insurance.includes(filters.insurance)) &&
-          (!filters.language || clinic.languages.includes(filters.language)) &&
-          (!filters.minimumRating || (clinic.rating?.rating ?? 0) >= filters.minimumRating) &&
-          (!filters.specialty || clinic.specialties.includes(filters.specialty)) &&
-          (filters.visitMode === 'all' || clinic.visitModes.includes(filters.visitMode)) &&
-          (filters.timing !== 'open-now' || clinic.status === 'open') &&
-          (!['morning', 'afternoon'].includes(filters.timing) || clinic.historicalWaits.some((record) => record[filters.timing as 'morning' | 'afternoon'] > 0)) &&
-          clinic.distanceMiles <= filters.maxDistance
-        );
-      })
-      .sort((a, b) => {
-        if (filters.timing === 'morning' || filters.timing === 'afternoon') {
-          const period = filters.timing;
-          const typical = (clinic: Clinic) => {
-            const records = clinic.historicalWaits.filter((record) => record[period] > 0);
-            return records.reduce((sum, record) => sum + record[period], 0) / records.length;
-          };
-          return typical(a) - typical(b);
-        }
-        if (a.status !== b.status) return a.status === 'open' ? -1 : 1;
-        return a.distanceMiles - b.distanceMiles;
-      });
+    return searchDirectory(clinics, filters);
   },
 
   async getClinicById(id) {
@@ -152,11 +104,20 @@ export const mockClinicService: ClinicDataService = {
 
   async getSavedAppointments() {
     await delay(80);
-    const value = window.localStorage.getItem('mediq-appointments');
-    return value ? (JSON.parse(value) as SavedAppointment[]) : [];
+    return []; // Guest plans live only in AppContext memory.
   },
 };
 
-// Production swap point. Implement ClinicDataService here with REST, GraphQL, or SQL-backed
-// endpoints. Components import this adapter instead of reading mock data directly.
-export const clinicService: ClinicDataService = mockClinicService;
+const reportKeys = new Map<string, string>();
+export const clearReportRequests = () => reportKeys.clear();
+export const backendClinicService: ClinicDataService = {
+  searchClinics: filters => api(`/clinics?filters=${encodeURIComponent(JSON.stringify(filters))}`),
+  async getClinicById(id) { try { return await api<Clinic>(`/clinics/${encodeURIComponent(id)}`); } catch(error) { if(error instanceof ApiError && error.status === 404) return undefined; throw error; } },
+  async getLiveEstimate(id,mode) { return (await this.getClinicById(id))?.estimates.find(e => e.mode === mode); },
+  async getHistoricalWaits(id) { return (await this.getClinicById(id))?.historicalWaits || []; },
+  submitWaitReport(draft) { const serialized = JSON.stringify(draft); const key = reportKeys.get(serialized) || crypto.randomUUID(); if (reportKeys.size > 100) reportKeys.clear(); reportKeys.set(serialized,key); return api('/reports','POST',draft,{'Idempotency-Key':key}); },
+  saveAppointment: appointment => api('/plans','PUT',appointment),
+  async getSavedAppointments() { return (await api<{savedAppointments:SavedAppointment[]}>('/me')).savedAppointments || []; },
+};
+// Configured mode never falls back to fictional data after a failed request.
+export const clinicService: ClinicDataService = backendEnabled ? backendClinicService : mockClinicService;

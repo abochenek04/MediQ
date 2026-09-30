@@ -20,19 +20,24 @@ import { Link } from '../utils/navigation';
 import { formatDateTime, formatTime, getVisitPlan } from '../utils/time';
 
 export function SavedPage() {
-  const { t, savedAppointments, savedClinicIds, removeAppointment, toggleSavedClinic } = useApp();
+  const { t, user, language, savedAppointments, savedClinicIds, removeAppointment, toggleSavedClinic } = useApp();
+  const [loadError, setLoadError] = useState(false);
+  const [retry, setRetry] = useState(0);
   const [clinicMap, setClinicMap] = useState<Record<string, Clinic>>({});
 
   useEffect(() => {
+    let active = true; setLoadError(false);
     const ids = [...new Set([...savedAppointments.map((item) => item.clinicId), ...savedClinicIds])];
     void Promise.all(ids.map((id) => clinicService.getClinicById(id))).then((items) => {
+      if (!active) return;
       const nextMap: Record<string, Clinic> = {};
       items.forEach((clinic) => {
         if (clinic) nextMap[clinic.id] = clinic;
       });
       setClinicMap(nextMap);
-    });
-  }, [savedAppointments, savedClinicIds]);
+    }, () => { if (active) setLoadError(true); });
+    return () => { active = false; };
+  }, [savedAppointments, savedClinicIds, retry]);
 
   const savedClinics = savedClinicIds.map((id) => clinicMap[id]).filter(Boolean);
 
@@ -45,9 +50,11 @@ export function SavedPage() {
             <h1>{t("Appointments")}</h1>
             <p>{t("Keep the parts of your day in one place—appointment, travel, buffer, and expected visit time.")}</p>
           </div>
-          <DemoBadge label={t("Stored on this device")} />
+          <DemoBadge label={t(user ? 'Saved to your private account' : 'Temporary guest session')} />
         </div>
 
+        <p className="info-note">{t('Saved visit plans are not confirmed clinic bookings.')}</p>
+        {loadError && <p role="alert">{t('The service is unavailable. Please try again.')} <button className="button button-secondary" onClick={() => setRetry(n => n + 1)}>{t('Try again')}</button></p>}
         {savedAppointments.length === 0 ? (
           <div className="empty-state saved-empty">
             <span className="empty-icon"><CalendarDays aria-hidden="true" /></span>
@@ -65,9 +72,9 @@ export function SavedPage() {
                 <article className="appointment-card" key={appointment.id}>
                   <div className="appointment-card-head">
                     <div className="appointment-date-block">
-                      <span>{new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date(appointment.appointmentTime))}</span>
+                      <span>{new Intl.DateTimeFormat(language, { month: 'short' }).format(new Date(appointment.appointmentTime))}</span>
                       <strong>{new Date(appointment.appointmentTime).getDate()}</strong>
-                      <small>{new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(new Date(appointment.appointmentTime))}</small>
+                      <small>{new Intl.DateTimeFormat(language, { weekday: 'short' }).format(new Date(appointment.appointmentTime))}</small>
                     </div>
                     <div className="appointment-identity">
                       <div className="title-kicker-row">
@@ -85,7 +92,7 @@ export function SavedPage() {
                     </div>
                   </div>
 
-                  <div className="plan-timeline" aria-label="Visit planning timeline">
+                  <div className="plan-timeline" aria-label={t('Visit planning timeline')}>
                     <div className="plan-stop leave-stop">
                       <span className="plan-stop-icon"><Navigation aria-hidden="true" /></span>
                       <span><small>{t("Leave by")}</small><strong>{formatTime(plan.leaveBy.toISOString())}</strong></span>
@@ -142,7 +149,7 @@ export function SavedPage() {
                 <article key={clinic.id}>
                   <div className="saved-clinic-icon" style={{ background: `${clinic.accent}22`, color: clinic.accent }}><Bookmark aria-hidden="true" fill="currentColor" /></div>
                   <div><span>{clinic.type}</span><h3>{clinic.name}</h3><p>{clinic.distanceMiles.toFixed(1)} mi · {clinic.estimates[0].totalMinutes} {t("min demo visit")}</p></div>
-                  <Link to={`/clinic/${clinic.id}`} aria-label={`View ${clinic.name}`}><ArrowRight aria-hidden="true" /></Link>
+                  <Link to={`/clinic/${clinic.id}`} aria-label={t('View {clinic}', { clinic: clinic.name })}><ArrowRight aria-hidden="true" /></Link>
                   <button type="button" onClick={() => toggleSavedClinic(clinic.id)}>{t("Remove")}</button>
                 </article>
               ))}

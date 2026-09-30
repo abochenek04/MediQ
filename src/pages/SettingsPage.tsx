@@ -1,0 +1,35 @@
+import { useState, useRef, type FormEvent } from 'react';
+import { useApp } from '../context/AppContext';
+import { api, authRequest, announceAccountChange, errorKey } from '../services/api';
+import { PasswordField } from './AccountPage';
+import { Modal } from '../components/UI';
+import { Link, navigate } from '../utils/navigation';
+import type { PrivateProfile } from '../services/account';
+export function SettingsPage(){
+ const {user,profile,t,pushToast,refreshAccount}=useApp();
+ if(!user||!profile)return <div className="shell page-space"><h1>{t('Settings')}</h1><p>{t('Sign in to manage your account.')}</p><Link to="/login">{t('Sign in')}</Link></div>;
+ return <SettingsForm key={user.id} initial={profile} />;
+}
+function SettingsForm({initial}:{initial:PrivateProfile}){
+ const {user,t,pushToast,refreshAccount,language}=useApp();const [profile,setProfile]=useState(initial);const [firstName,setFirstName]=useState(user!.firstName);const [lastName,setLastName]=useState(user!.lastName);
+ const [busy,setBusy]=useState(false);const lock=useRef(false);const [error,setError]=useState('');const [currentPassword,setCurrentPassword]=useState('');const [newPassword,setNewPassword]=useState('');
+ const [deleting,setDeleting]=useState(false);const [deletePassword,setDeletePassword]=useState('');const [confirmation,setConfirmation]=useState('');
+ const run=async(action:()=>Promise<void>)=>{if(lock.current)return;lock.current=true;setBusy(true);setError('');try{await action();}catch(e){setError(errorKey(e));}finally{setBusy(false);lock.current=false;}};
+ const save=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();if (!e.currentTarget.checkValidity()) { setError('Check the form and try again.'); e.currentTarget.querySelector<HTMLElement>(':invalid')?.focus(); return; } void run(async()=>{await api('/profile','PUT',{...profile,language,firstName,lastName});await refreshAccount();pushToast(t('Settings saved.'),'success');});};
+ const changePassword=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();if (!e.currentTarget.checkValidity()) { setError('Check the form and try again.'); e.currentTarget.querySelector<HTMLElement>(':invalid')?.focus(); return; } void run(async()=>{await authRequest('/change-password',{currentPassword,newPassword,revokeOtherSessions:true});setCurrentPassword('');setNewPassword('');announceAccountChange();pushToast(t('Password changed. Other sessions were revoked.'),'success');});};
+ const remove=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();if (!e.currentTarget.checkValidity()) { setError('Check the form and try again.'); e.currentTarget.querySelector<HTMLElement>(':invalid')?.focus(); return; } void run(async()=>{await api('/account','DELETE',{password:deletePassword,confirmation});setDeletePassword('');announceAccountChange();navigate('/find');});};
+ return <div className="shell page-space settings-shell"><h1>{t('Settings')}</h1><p>{t('Your profile is private. Optional fields start empty and can be cleared.')}</p>
+  <form className="account-card account-form" onSubmit={save} noValidate><h2>{t('Profile')}</h2><div className="field-pair">
+   <label className="field-label"><span>{t('First name')}</span><input required maxLength={80} value={firstName} onChange={e=>setFirstName(e.target.value)} autoComplete="given-name" /></label><label className="field-label"><span>{t('Last name')}</span><input required maxLength={80} value={lastName} onChange={e=>setLastName(e.target.value)} autoComplete="family-name" /></label>
+  </div><label className="field-label"><span>{t('Email')}</span><input readOnly value={user!.email} /></label><h3>{t('Optional personal information')}</h3><p>{t('Sex and gender are different. These fields are never included in reports or activity metrics.')}</p>
+  <div className="field-pair"><label className="field-label"><span>{t('Sex')}</span><select value={profile.sex||''} onChange={e=>setProfile({...profile,sex:(e.target.value||null) as PrivateProfile['sex']})}><option value="">{t('Not provided')}</option>{['female','male','intersex'].map(value=><option key={value} value={value}>{t(value)}</option>)}</select></label><label className="field-label"><span>{t('Gender')}</span><input maxLength={80} placeholder={t('Not provided')} value={profile.gender||''} onChange={e=>setProfile({...profile,gender:e.target.value||null})} /></label></div>
+  <div className="field-pair">{([['weightKg','Weight (kg)',1,650],['heightCm','Height (cm)',30,300],['age','Age (years)',0,125]] as const).map(([key,label,min,max])=><label key={key} className="field-label"><span>{t(label)}</span><input type="number" min={min} max={max} step={key==='age'?1:0.1} placeholder={t('Not provided')} value={profile[key]??''} onChange={e=>setProfile({...profile,[key]:e.target.value===''?null:Number(e.target.value)})} /></label>)}</div>
+  <label className="check-row"><input type="checkbox" checked={profile.notifications} onChange={e=>setProfile({...profile,notifications:e.target.checked})} />{t('Allow future visit notifications. Delivery is not configured.')}</label>
+  <button type="button" className="text-button" onClick={()=>setProfile({...profile,sex:null,gender:null,weightKg:null,heightCm:null,age:null})}>{t('Clear optional fields')}</button>
+  <button disabled={busy} className="button button-primary">{t(busy?'Please wait…':'Save settings')}</button></form>
+  <form className="account-card account-form" onSubmit={changePassword} noValidate><h2>{t('Change password')}</h2><PasswordField label="Current password" value={currentPassword} onChange={setCurrentPassword} /><PasswordField label="New password" value={newPassword} onChange={setNewPassword} newPassword /><button disabled={busy} className="button button-secondary">{t('Change password')}</button></form>
+  {error&&!deleting&&<p className="form-error" role="alert">{t(error)}</p>}
+  <section className="account-card"><h2>{t('Delete account')}</h2><p>{t('Deletion removes your identity, private profile, saved plans, saved clinics and submitted account reports. Aggregate counts remain. Backups may retain data until their retention period ends.')}</p><button className="button button-danger" onClick={()=>{setError('');setDeleting(true);}}>{t('Delete account')}</button></section>
+  {deleting&&<Modal title={t('Permanently delete account?')} onClose={()=>{if(!busy){setDeleting(false);setDeletePassword('');}}}><form className="account-form" onSubmit={remove} noValidate><p>{t('This cannot be undone. Enter your password and type DELETE to confirm.')}</p><PasswordField label="Current password" value={deletePassword} onChange={setDeletePassword} /><label className="field-label"><span>{t('Type DELETE')}</span><input required pattern="DELETE" autoComplete="off" value={confirmation} onChange={e=>setConfirmation(e.target.value)} /></label>{error&&<p className="form-error" role="alert">{t(error)}</p>}<button disabled={busy||confirmation!=='DELETE'} className="button button-danger">{t(busy?'Please wait…':'Permanently delete account')}</button></form></Modal>}
+ </div>;
+}

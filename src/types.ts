@@ -17,6 +17,8 @@ export interface VisitStage {
 }
 
 export interface LiveWaitEstimate {
+  evidenceState?: 'ready' | 'insufficient' | 'stale';
+  reliability?: ReliabilityScore;
   mode: VisitMode;
   totalMinutes: number;
   range: [number, number];
@@ -48,6 +50,7 @@ export interface ReliabilityScore {
 }
 
 export interface PatientReport {
+  moderationStatus?: 'accepted' | 'review' | 'rejected';
   id: string;
   clinicId: string;
   submittedAt: string;
@@ -162,6 +165,7 @@ export interface SavedAppointment {
 }
 
 export interface WaitReportDraft {
+  timezoneOffsetMinutes?: number;
   reportKind?: 'completed-visit' | 'current-wait';
   elapsedMinutes?: number;
   clinicId: string;

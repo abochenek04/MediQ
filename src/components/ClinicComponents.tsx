@@ -22,7 +22,7 @@ export const formatMode = (mode: VisitMode) =>
 
 export function VisitBreakdown({ estimate, compact = false }: { estimate: LiveWaitEstimate; compact?: boolean }) {
   const { t } = useApp();
-  const palette = ['#f2a18f', '#e9c66e', '#77a7b3', '#63a98e'];
+  const palette = ['#d1601a', '#2e9fe5', '#376b91', '#68b7d6'];
   return (
     <div className={compact ? 'visit-breakdown compact' : 'visit-breakdown'}>
       <div className="stage-bar" aria-hidden="true">
@@ -36,7 +36,7 @@ export function VisitBreakdown({ estimate, compact = false }: { estimate: LiveWa
           />
         ))}
       </div>
-      <div className="stage-labels" aria-label="Estimated visit stages">
+      <div className="stage-labels" aria-label={t("Estimated visit stages")}>
         {estimate.stages.map((stage, index) => (
           <div key={stage.label} title={t(stage.label)}>
             <span className="stage-key" style={{ backgroundColor: palette[index] }} />
@@ -80,7 +80,7 @@ export function ClinicCard({
           <div>
             <div className="clinic-kicker">
               {clinic.type}
-              {clinic.isSponsored && <span className="sponsored-label">Sponsored</span>}
+              {clinic.isSponsored && <span className="sponsored-label">{t('Sponsored')}</span>}
             </div>
             <h3><Link to={`/clinic/${clinic.id}`}>{clinic.name}</Link></h3>
           </div>
@@ -89,7 +89,7 @@ export function ClinicCard({
           className={isSaved ? 'icon-button saved' : 'icon-button'}
           type="button"
           onClick={() => toggleSavedClinic(clinic.id)}
-          aria-label={isSaved ? `Remove ${clinic.name} from saved clinics` : `Save ${clinic.name}`}
+          aria-label={t(isSaved ? 'Remove {clinic} from saved clinics' : 'Save {clinic}', { clinic: clinic.name })}
           aria-pressed={isSaved}
         >
           <Bookmark aria-hidden="true" fill={isSaved ? 'currentColor' : 'none'} />
@@ -113,7 +113,7 @@ export function ClinicCard({
         <div className="estimate-context">
           <span className="mode-pill">{t(formatMode(estimate.mode))}</span>
           <span className="updated"><Clock3 aria-hidden="true" /> {t('Updated {minutes}m ago', { minutes: estimate.updatedMinutesAgo })}</span>
-          <ReliabilityBadge score={clinic.reliability.score} level={clinic.reliability.level} />
+          <ReliabilityBadge score={(estimate.reliability || clinic.reliability).score} level={(estimate.reliability || clinic.reliability).level} />
         </div>
       </div>
 
@@ -155,7 +155,7 @@ export function MapView({
 
   return (
     <div className="map-experience">
-      <div className="mock-map" aria-label="Stylized map of fictional clinics near Durham">
+      <div className="mock-map" aria-label={t("Stylized map of fictional clinics near Durham")}>
         <div className="map-grid" aria-hidden="true" />
         <div className="road road-one" aria-hidden="true" />
         <div className="road road-two" aria-hidden="true" />
@@ -176,7 +176,7 @@ export function MapView({
               className={selected.id === clinic.id ? 'map-marker selected' : 'map-marker'}
               style={{ left: `${clinic.coordinates.x}%`, top: `${clinic.coordinates.y}%` }}
               onClick={() => onSelect(clinic.id)}
-              aria-label={`${clinic.name}, ${estimate.totalMinutes} minute ${t(formatMode(estimate.mode))} estimate`}
+              aria-label={t('{clinic}, {minutes} minute {mode} estimate', {clinic: clinic.name, minutes: estimate.totalMinutes, mode: t(formatMode(estimate.mode))})}
               aria-pressed={selected.id === clinic.id}
             >
               <span>{estimate.totalMinutes}m</span>
@@ -186,7 +186,7 @@ export function MapView({
         })}
         <div className="map-legend"><span className="demo-dot" /> {t("Stylized prototype map")}</div>
       </div>
-      <aside className="map-side-list" aria-label="Map results">
+      <aside className="map-side-list" aria-label={t("Map results")}>
         <p className="map-result-count">{clinics.length} nearby options</p>
         {clinics.map((clinic, index) => {
           const estimate = clinic.estimates.find((item) => item.mode === preferredMode) || clinic.estimates[0];
@@ -231,11 +231,11 @@ export function HistoricalChart({ records, takeaway }: { records: HistoricalWait
   const slot = (right - left) / Math.max(chartRecords.length, 1);
   const y = (value: number) => plotBottom - (value / maxValue) * plotHeight;
   const ticks = useMemo(() => [0, 30, 60, 90, 120, 150].filter((tick) => tick <= maxValue + 10), [maxValue]);
-  const metricLabel = metric === 'typical' ? 'daily typical' : metric;
+  const metricLabel = metric === 'typical' ? 'Daily typical' : metric === 'morning' ? 'Morning' : 'Afternoon';
 
   return (
     <div className="history-chart-wrap">
-      <div className="chart-controls" aria-label="Historical chart time of day">
+      <div className="chart-controls" aria-label={t("Historical chart time of day")}>
         {(['typical', 'morning', 'afternoon'] as ChartMetric[]).map((option) => (
           <button
             type="button"
@@ -244,7 +244,7 @@ export function HistoricalChart({ records, takeaway }: { records: HistoricalWait
             onClick={() => setMetric(option)}
             aria-pressed={metric === option}
           >
-            {option === 'typical' ? t("Daily typical") : option[0].toUpperCase() + option.slice(1)}
+            {option === 'typical' ? t("Daily typical") : t(option[0].toUpperCase() + option.slice(1))}
           </button>
         ))}
       </div>
@@ -255,9 +255,9 @@ export function HistoricalChart({ records, takeaway }: { records: HistoricalWait
           role="img"
           aria-labelledby="history-chart-title history-chart-description"
         >
-          <title id="history-chart-title">Historical total visit time by day</title>
+          <title id="history-chart-title">{t('Historical total visit time by day')}</title>
           <desc id="history-chart-description">
-            Shows the expected range and {metricLabel} total visit time in minutes. {takeaway}
+            {t('Expected range and {metric} total visit time in minutes.', {metric: t(metricLabel)})} {takeaway}
           </desc>
           {ticks.map((tick) => (
             <g key={tick}>
@@ -265,7 +265,7 @@ export function HistoricalChart({ records, takeaway }: { records: HistoricalWait
               <text x={left - 12} y={y(tick) + 4} textAnchor="end" className="chart-y-label">{tick}</text>
             </g>
           ))}
-          <text x={14} y={22} className="chart-unit">MIN</text>
+          <text x={14} y={22} className="chart-unit">{t("min")}</text>
           {chartRecords.map((record, index) => {
             const center = left + slot * index + slot / 2;
             const value = record[metric];
@@ -281,7 +281,7 @@ export function HistoricalChart({ records, takeaway }: { records: HistoricalWait
                 />
                 <circle cx={center} cy={y(value)} r={6} className="chart-point" />
                 <text x={center} y={y(value) - 12} textAnchor="middle" className="chart-value">{value}</text>
-                <text x={center} y={plotBottom + 28} textAnchor="middle" className="chart-day">{record.day}</text>
+                <text x={center} y={plotBottom + 28} textAnchor="middle" className="chart-day">{new Intl.DateTimeFormat(document.documentElement.lang, {weekday: 'short'}).format(new Date(2026, 0, 5 + ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].indexOf(record.day)))}</text>
               </g>
             );
           })}
@@ -290,7 +290,7 @@ export function HistoricalChart({ records, takeaway }: { records: HistoricalWait
       <div className="chart-footer">
         <div className="chart-legend">
           <span><i className="legend-range" /> {t("Expected range")}</span>
-          <span><i className="legend-dot" /> {metricLabel} time</span>
+          <span><i className="legend-dot" /> {t('{metric} time', {metric: t(metricLabel)})}</span>
         </div>
         <p><Check aria-hidden="true" /> {takeaway}</p>
       </div>
@@ -301,7 +301,7 @@ export function HistoricalChart({ records, takeaway }: { records: HistoricalWait
 export function RatingStars({ value, label }: { value: number; label: string }) {
   const { t } = useApp();
   return (
-    <span className="rating-value" aria-label={`${label}: ${value} out of 5`}>
+    <span className="rating-value" aria-label={t('{label}: {value} out of 5', {label, value})}>
       <Star aria-hidden="true" fill="currentColor" /> {value.toFixed(1)}
     </span>
   );
