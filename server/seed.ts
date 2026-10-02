@@ -1,0 +1,22 @@
+import { clinics } from '../src/data/mockData.ts';
+import { transaction, writeClinic, type DB } from './database.ts';
+import type { ServerConfig } from './config.ts';
+const tasks = [
+ ['cloud','Separate cloud services','Isolation prevents test data entering production.','Create staging and production services with separate disks, secrets and email sender configuration.','Both /api/health endpoints show their intended environment.'],
+ ['email','Verify the email sender','Accounts require working verification and recovery email.','Verify a Resend sender domain; configure MAIL_FROM and RESEND_API_KEY in each service.','Complete signup, resend and recovery from an external mailbox.'],
+ ['directory','Obtain real clinic and provider data','Current clinics and people are fictional.','Obtain directory permission, source attribution, update cadence and reviewed capability lists.','Review approved imported records and source metadata in staging.'],
+ ['ratings','License ratings sources','Fictional ratings cannot represent real services.','Choose an authorized provider and configure its server adapter.','Verify source attribution, cache terms and unavailable responses.'],
+ ['travel','Configure travel estimates','Current travel minutes are manually entered.','Contract an authorized routing source and implement the documented adapter contract.','Compare returned route duration with provider results; test outage behavior.'],
+ ['booking','Connect clinic booking systems','Saved plans are not confirmed appointments.','Obtain clinic scheduling credentials and reservation/availability contract.','Validate reservation confirmations, cancellations and idempotency in provider sandbox.'],
+ ['domains','Configure domains and HTTPS','Secure cookies require HTTPS in staging and production.','Attach distinct domains, update APP_ORIGIN, TLS and reverse-proxy configuration.','Verify cookies, exact-origin checks, direct routes and password flows.'],
+ ['jobs','Enable and monitor scheduled jobs','Estimates and retention need regular updates.','Run npm run jobs every five minutes on each service; configure failure alerts.','Inspect successful recent job runs and deliberately test a failure.'],
+ ['backups','Validate backups and restore','A persistent disk alone is not a backup.','Encrypt daily SQLite snapshots off-host; define retention and test restoration.','Restore to a separate staging disk; reconcile deletions before reopening access.'],
+ ['monitoring','Connect operational monitoring','Failures must be noticed promptly.','Monitor health, job age, storage capacity and email errors without logging identities or searches.','Trigger a controlled staging failure and verify an alert.'],
+ ['reviews','Complete outside reviews','Real personal data and care navigation need careful review.','Arrange privacy/security, clinical-safety, accessibility and native-speaker reviews in all seven languages.','Record review findings, resolve launch blockers and approve a limited pilot.'],
+ ['notifications','Choose notification delivery with consent','Notification preference does not imply delivery.','Select an authorized delivery provider and implement consent checks through the extension point.','Test opt-in, opt-out and a real sandbox delivery before advertising alerts.'],
+];
+export function seedTasks(db: DB) { for (const [id,title,why,action,verification] of tasks) db.prepare('INSERT OR IGNORE INTO launch_tasks(id,title,why,action,verification,guide) VALUES (?,?,?,?,?,?)').run(id,title,why,action,verification,'/docs/runbook.md'); }
+export function seedDemo(db: DB, config: ServerConfig) {
+ if (!['development','test','staging'].includes(config.environment)) throw new Error('Fictional seed is forbidden in production');
+ transaction(db,()=> { for (const clinic of clinics) if (!db.prepare('SELECT id FROM clinics WHERE id=?').get(clinic.id)) writeClinic(db,clinic); seedTasks(db); });
+}

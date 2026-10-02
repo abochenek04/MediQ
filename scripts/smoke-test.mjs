@@ -75,7 +75,7 @@ try {
     logLevel: 'silent',
   });
   try {
-    const { clinicService } = await vite.ssrLoadModule('/src/services/clinicService.ts');
+    const { mockClinicService: clinicService } = await vite.ssrLoadModule('/src/services/clinicService.ts');
     const baseFilters = {
       query: '', insurance: '', specialty: '', language: '', minimumRating: 0, visitMode: 'all', timing: 'all', maxDistance: 25,
     };

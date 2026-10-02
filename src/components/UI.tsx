@@ -17,7 +17,7 @@ export function DemoBadge({ label = 'Prototype data' }: { label?: string }) {
 export function ReliabilityBadge({ score, level }: { score: number; level: ConfidenceLevel }) {
   const { t } = useApp();
   return (
-    <span data-tour="reliability" className={`reliability-badge reliability-${level}`} aria-label={`${score} percent reliability, ${t(level)} confidence`}>
+    <span data-tour="reliability" className={`reliability-badge reliability-${level}`} aria-label={t('{score} percent reliability, {level} confidence', {score, level: t(level)})}>
       <ShieldCheck aria-hidden="true" size={15} />
       {score}% · {t(level)}
     </span>

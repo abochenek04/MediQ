@@ -79,9 +79,9 @@ export const clinics: Clinic[] = [
     phone: '(919) 555-0142',
     visitModes: ['walk-in', 'urgent'],
     specialties: ['Urgent care', 'Minor injuries', 'Illness visits'],
-    symptoms: ['sore throat', 'fever', 'sprain', 'cough', 'minor injury'],
+    symptoms: ['headache', 'sore throat', 'fever', 'sprain', 'cough', 'minor injury'],
     insurance: ['Aetna', 'Blue Cross Blue Shield', 'Cigna', 'Medicaid', 'Self-pay'],
-    languages: ['English', 'Spanish'],
+    languages: ['English', 'Spanish', 'Polish'],
     estimates: [
       {
         mode: 'walk-in',
@@ -193,7 +193,7 @@ export const clinics: Clinic[] = [
     phone: '(919) 555-0186',
     visitModes: ['scheduled', 'walk-in'],
     specialties: ['Family medicine', 'Primary care', 'Preventive care'],
-    symptoms: ['checkup', 'wellness', 'blood pressure', 'physical', 'cold'],
+    symptoms: ['headache', 'checkup', 'wellness', 'blood pressure', 'physical', 'cold'],
     insurance: ['Aetna', 'Blue Cross Blue Shield', 'Cigna', 'Medicare', 'UnitedHealthcare'],
     languages: ['English', 'Spanish', 'French'],
     estimates: [
@@ -284,7 +284,7 @@ export const clinics: Clinic[] = [
     specialties: ['Pediatrics', 'Well-child visits', 'Same-day sick visits'],
     symptoms: ['child', 'pediatric', 'fever', 'earache', 'well child'],
     insurance: ['Aetna', 'Blue Cross Blue Shield', 'Medicaid', 'UnitedHealthcare', 'Self-pay'],
-    languages: ['English', 'Spanish', 'Arabic'],
+    languages: ['English', 'Spanish', 'Arabic', 'Gujarati', 'Hindi'],
     estimates: [
       {
         mode: 'scheduled', totalMinutes: 49, range: [41, 60], updatedMinutesAgo: 9, contributingReports: 15,
@@ -604,6 +604,9 @@ export const sampleAppointment: SavedAppointment = {
 };
 
 export const languages = [
+  { code: 'pl', label: 'Polski' },
+  { code: 'gu', label: 'ગુજરાતી' },
+  { code: 'hi', label: 'हिन्दी' },
   { code: 'en', label: 'English' },
   { code: 'es', label: 'Español' },
   { code: 'zh', label: '中文' },

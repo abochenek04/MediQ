@@ -28,7 +28,7 @@ import { formatDateTime, formatTime, getVisitPlan } from '../utils/time';
 const defaultFilters = defaultSearchFilters;
 
 type ViewMode = 'list' | 'map';
-type SortMode = 'distance' | 'shortest' | 'reliability';
+type SortMode = 'recommended' | 'distance' | 'shortest' | 'reliability';
 
 export function FindCarePage() {
   const { savedAppointments, pushToast, t } = useApp();
@@ -38,7 +38,7 @@ export function FindCarePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [view, setView] = useState<ViewMode>('list');
-  const [sort, setSort] = useState<SortMode>('distance');
+  const [sort, setSort] = useState<SortMode>('recommended');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedClinicId, setSelectedClinicId] = useState('');
   const [upcomingClinic, setUpcomingClinic] = useState<Clinic | undefined>();
@@ -78,7 +78,9 @@ export function FindCarePage() {
       setUpcomingClinic(undefined);
       return;
     }
-    void clinicService.getClinicById(upcoming.clinicId).then(setUpcomingClinic);
+    let active = true;
+    void clinicService.getClinicById(upcoming.clinicId).then(value => { if (active) setUpcomingClinic(value); }, () => { if (active) setUpcomingClinic(undefined); });
+    return () => { active = false; };
   }, [upcoming]);
 
   const sortedResults = useMemo(() => {
@@ -87,9 +89,9 @@ export function FindCarePage() {
       return copy.sort((a, b) => (a.estimates.find(e => e.mode === filters.visitMode) || a.estimates[0]).totalMinutes - (b.estimates.find(e => e.mode === filters.visitMode) || b.estimates[0]).totalMinutes);
     }
     if (sort === 'reliability') {
-      return copy.sort((a, b) => b.reliability.score - a.reliability.score);
+      return copy.sort((a, b) => (b.estimates.find(e => e.mode === filters.visitMode)?.reliability || b.reliability).score - (a.estimates.find(e => e.mode === filters.visitMode)?.reliability || a.reliability).score);
     }
-    return filters.timing === 'morning' || filters.timing === 'afternoon' ? copy : copy.sort((a, b) => a.distanceMiles - b.distanceMiles);
+    return sort === 'recommended' ? copy : copy.sort((a, b) => a.distanceMiles - b.distanceMiles);
   }, [results, sort, filters.timing, filters.visitMode]);
 
   const activeFilterCount = [
@@ -117,7 +119,7 @@ export function FindCarePage() {
     if (key === 'walk-in') updateFilter('visitMode', filters.visitMode === 'walk-in' ? 'all' : 'walk-in');
     if (key === 'scheduled') updateFilter('visitMode', filters.visitMode === 'scheduled' ? 'all' : 'scheduled');
     if (key === 'open') updateFilter('timing', filters.timing === 'open-now' ? 'all' : 'open-now');
-    if (key === 'pediatrics') updateFilter('specialty', filters.specialty === 'Pediatrics' ? '' : t("Pediatrics"));
+    if (key === 'pediatrics') updateFilter('specialty', filters.specialty === 'Pediatrics' ? '' : 'Pediatrics');
     if (key === 'medicaid') updateFilter('insurance', filters.insurance === 'Medicaid' ? '' : 'Medicaid');
   };
 
@@ -181,7 +183,7 @@ export function FindCarePage() {
             <p className="location-status" role="status">{t(locationMessage)} {filters.origin && <button className="text-button" type="button" onClick={() => { locationRequestId.current++; setLocationBusy(false); setFilters(current => ({ ...current, origin: undefined })); setLocationMessage('Demo distances from downtown Durham.'); }}>{t('Use demo location')}</button>}</p>
           </form>
 
-          <div className="quick-filters" aria-label="Quick filters">
+          <div className="quick-filters" aria-label={t('Quick picks')}>
             <span>{t("Quick picks")}</span>
             <button type="button" className={filters.visitMode === 'walk-in' ? 'active' : ''} onClick={() => applyQuickFilter('walk-in')}>{t("Walk-in care")}</button>
             <button type="button" className={filters.visitMode === 'scheduled' ? 'active' : ''} onClick={() => applyQuickFilter('scheduled')}>{t("Scheduled visits")}</button>
@@ -196,7 +198,7 @@ export function FindCarePage() {
         {upcoming && upcomingClinic && upcomingPlan && (
           <section className="upcoming-visit-card" aria-labelledby="upcoming-title">
             <div className="upcoming-date-tile" aria-hidden="true">
-              <span>{new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date(upcoming.appointmentTime))}</span>
+              <span>{new Intl.DateTimeFormat(document.documentElement.lang, { month: 'short' }).format(new Date(upcoming.appointmentTime))}</span>
               <strong>{new Date(upcoming.appointmentTime).getDate()}</strong>
             </div>
             <div className="upcoming-main">
@@ -256,7 +258,7 @@ export function FindCarePage() {
               <div className="select-wrap">
                 <select value={filters.specialty} onChange={(event) => updateFilter('specialty', event.target.value)}>
                   <option value="">{t("Any specialty")}</option>
-                  {specialtyOptions.map((specialty) => <option key={specialty} value={specialty}>{specialty}</option>)}
+                  {specialtyOptions.map((specialty) => <option key={specialty} value={specialty}>{t(specialty)}</option>)}
                 </select>
                 <ChevronDown aria-hidden="true" />
               </div>
@@ -278,7 +280,7 @@ export function FindCarePage() {
               {(['all', 'scheduled', 'walk-in', 'urgent'] as const).map((mode) => (
                 <label key={mode}>
                   <input type="radio" name="visit-mode" checked={filters.visitMode === mode} onChange={() => updateFilter('visitMode', mode)} />
-                  <span>{mode === 'all' ? t("Any visit type") : mode === 'walk-in' ? t("Walk-in") : mode[0].toUpperCase() + mode.slice(1)}</span>
+                  <span>{mode === 'all' ? t("Any visit type") : mode === 'walk-in' ? t("Walk-in") : t(mode[0].toUpperCase() + mode.slice(1))}</span>
                 </label>
               ))}
             </fieldset>
@@ -296,7 +298,7 @@ export function FindCarePage() {
                 </label>
               ))}
             </fieldset>
-            <InfoNote>{t("Morning and afternoon prioritize shorter historical visits when sorted by nearest. All data is fictional.")}</InfoNote>
+            <InfoNote>{t("Recommended ranks searches by relevance. Without a search, morning and afternoon prioritize shorter historical visits.")}</InfoNote>
           </aside>
 
           <div className="results-column">
@@ -317,6 +319,7 @@ export function FindCarePage() {
                 <label className="sort-control">
                   <span className="sr-only">{t("Sort results")}</span>
                   <select value={sort} onChange={(event) => setSort(event.target.value as SortMode)}>
+                    <option value="recommended">{t("Recommended / relevance")}</option>
                     <option value="distance">{t("Nearest first")}</option>
                     <option value="shortest">{t("Shortest visit")}</option>
                     <option value="reliability">{t("Highest confidence")}</option>

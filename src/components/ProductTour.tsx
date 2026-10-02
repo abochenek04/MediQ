@@ -12,12 +12,12 @@ const steps = [
   ['report', 'Report wait', 'Share your visit experience to improve MediQ’s timing information.'],
 ];
 export function ProductTour({ currentPath }: { currentPath: string }) {
-  const { t } = useApp();
+  const { t, tourDone, finishTour } = useApp();
   const [step, setStep] = useState<number | null>(() => {
-    try { return currentPath === '/find' && !localStorage.getItem('mediq-tour-v1') ? 0 : null; } catch { return null; }
+    return currentPath === '/find' && !tourDone ? 0 : null;
   });
   const [rect, setRect] = useState<DOMRect | null>(null);
-  const finish = () => { setStep(null); try { localStorage.setItem('mediq-tour-v1', 'done'); } catch { /* Browsing still works without storage. */ } };
+  const finish = () => { setStep(null); finishTour(); };
   useEffect(() => {
     const replay = () => { navigate('/find'); setStep(0); };
     window.addEventListener('mediq:tour', replay);

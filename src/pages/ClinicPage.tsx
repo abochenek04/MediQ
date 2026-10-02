@@ -30,6 +30,7 @@ import {
 } from '../components/ClinicComponents';
 import { DemoBadge, InfoNote, Modal, PageLoader, ReliabilityBadge, SafetyNote } from '../components/UI';
 import { useApp } from '../context/AppContext';
+import { backendEnabled } from '../services/api';
 import { clinicService } from '../services/clinicService';
 import type { Clinic, SavedAppointment, VisitMode } from '../types';
 import { Link } from '../utils/navigation';
@@ -45,6 +46,8 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
     pushToast,
   } = useApp();
   const [clinic, setClinic] = useState<Clinic | undefined>();
+  const [loadError, setLoadError] = useState(false);
+  const [retry, setRetry] = useState(0);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<VisitMode>('scheduled');
   const [planOpen, setPlanOpen] = useState(false);
@@ -57,24 +60,27 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
   }));
 
   useEffect(() => {
-    setLoading(true);
+    let active = true; setLoading(true); setLoadError(false);
     void clinicService.getClinicById(clinicId).then((result) => {
+      if (!active) return;
       setClinic(result);
       if (result) setMode(result.visitModes[0]);
       setLoading(false);
-    });
-  }, [clinicId]);
+    }, () => { if (active) { setLoadError(true); setLoading(false); } });
+    return () => { active = false; };
+  }, [clinicId, retry]);
 
   const visibleReports = useMemo(() => {
     if (!clinic) return [];
     return [
       ...submittedReports.filter((report) => report.clinicId === clinic.id),
       ...clinic.recentReports,
-    ].slice(0, 6);
+    ].filter((report, index, all) => report.moderationStatus !== 'review' && all.findIndex(item => item.id === report.id) === index).slice(0, 6);
   }, [clinic, submittedReports]);
 
   if (loading) return <div className="shell page-space"><PageLoader label={t("Loading clinic details")} /></div>;
 
+  if (loadError) return <div className="shell page-space" role="alert"><p>{t('The service is unavailable. Please try again.')}</p><button className="button button-primary" onClick={() => setRetry(n => n + 1)}>{t('Try again')}</button></div>;
   if (!clinic) {
     return (
       <div className="shell page-space">
@@ -89,11 +95,13 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
   }
 
   const estimate = clinic.estimates.find((item) => item.mode === mode) || clinic.estimates[0];
+  const reliability = estimate.reliability || clinic.reliability;
   const isSaved = savedClinicIds.includes(clinic.id);
   const averageRating = clinic.rating?.rating ?? 0;
 
   const handleSavePlan = async (event: FormEvent) => {
     event.preventDefault();
+    if (savingPlan) return;
     setSavingPlan(true);
     const appointment: SavedAppointment = {
       id: `appointment-${Date.now()}`,
@@ -126,7 +134,7 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
     <div className="clinic-page">
       <div className="clinic-profile-top">
         <div className="shell">
-          <nav className="breadcrumb" aria-label="Breadcrumb">
+          <nav className="breadcrumb" aria-label={t('Breadcrumb')}>
             <Link to="/find"><ArrowLeft aria-hidden="true" /> {t("Care near Durham")}</Link>
             <ChevronRight aria-hidden="true" />
             <span aria-current="page">{clinic.name}</span>
@@ -179,7 +187,7 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
               <p>{t("These minutes cover arrival through departure—not just the waiting room.")}</p>
             </div>
             {clinic.visitModes.length > 1 && (
-              <div className="mode-toggle" aria-label="Visit type estimate">
+              <div className="mode-toggle" aria-label={t('Visit type estimate')}>
                 {clinic.visitModes.map((visitMode) => (
                   <button key={visitMode} type="button" className={mode === visitMode ? 'active' : ''} onClick={() => setMode(visitMode)} aria-pressed={mode === visitMode}>
                     {t(formatMode(visitMode))}
@@ -199,9 +207,10 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
             <div className="live-breakdown-panel">
               <div className="estimate-card-topline">
                 <span className="mode-pill">{t(formatMode(estimate.mode))}</span>
-                <ReliabilityBadge score={clinic.reliability.score} level={clinic.reliability.level} />
+                <ReliabilityBadge score={reliability.score} level={reliability.level} />
               </div>
               <VisitBreakdown estimate={estimate} />
+              {backendEnabled && <p className="info-note">{t(estimate.evidenceState === 'ready' ? 'Report-based total. Stage proportions are modeled, not measured.' : 'Not enough fresh reports. The displayed reference is fictional, not a live estimate.')}</p>}
               <p className="estimate-source-line"><Users aria-hidden="true" /> {estimate.contributingReports} {t("recent sample reports contribute to this view.")}</p>
             </div>
             <div className="live-action-panel">
@@ -231,15 +240,15 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
           <aside className="profile-card reliability-section" id="reliability" aria-labelledby="reliability-title">
             <span className="eyebrow">{t("Not a star rating")}</span>
             <h2 id="reliability-title">{t("Estimate confidence")}</h2>
-            <div className={`confidence-score score-${clinic.reliability.level}`}>
-              <div><strong>{clinic.reliability.score}</strong><span>/100</span></div>
-              <b>{clinic.reliability.level} {t("confidence")}</b>
+            <div className={`confidence-score score-${reliability.level}`}>
+              <div><strong>{reliability.score}</strong><span>/100</span></div>
+              <b>{t(reliability.level)} {t("confidence")}</b>
             </div>
-            <p>{clinic.reliability.summary}</p>
+            <p>{t(reliability.summary)}</p>
             <div className="factor-list">
-              {clinic.reliability.factors.map((factor) => (
-                <div className="factor" key={factor.label} title={factor.explanation}>
-                  <div><span>{factor.label}</span><strong>{factor.score}</strong></div>
+              {reliability.factors.map((factor) => (
+                <div className="factor" key={t(factor.label)} title={t(factor.explanation)}>
+                  <div><span>{t(factor.label)}</span><strong>{factor.score}</strong></div>
                   <div className="factor-track"><span style={{ width: `${factor.score}%` }} /></div>
                   <small>{factor.explanation}</small>
                 </div>
@@ -267,7 +276,7 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
                       <strong>{report.reportKind === 'current-wait' ? `${report.elapsedMinutes} ${t('min waiting so far')}` : `${report.totalMinutes} ${t('min total')}`} </strong>
                       <span className="mode-pill subtle">{t(formatMode(report.visitMode))}</span>
                     </div>
-                    <p>{report.source === 'patient report' ? 'Patient-submitted sample' : report.source} · {report.anonymous ? t("Anonymous") : t("Source labeled")}</p>
+                    <p>{report.source === 'patient report' ? t(backendEnabled ? 'Patient report' : 'Patient-submitted sample') : report.source} · {report.anonymous ? t("Anonymous") : t("Source labeled")}</p>
                     {report.note && <blockquote>“{report.note}”</blockquote>}
                   </div>
                   <time dateTime={report.submittedAt}>{relativeReportTime(report.submittedAt)}</time>
@@ -368,7 +377,7 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
 
       {planOpen && (
         <Modal title={t('Plan your visit')} onClose={() => setPlanOpen(false)}>
-            <p>{t("We’ll save this only in your browser. No medical details are needed.")}</p>
+            <p>{t("Guest plans reset on reload. Signed-in plans are saved privately. A plan is not a booking.")}</p>
             <form onSubmit={handleSavePlan}>
               <label className="field-label">
                 <span>{t("Appointment or planned arrival")}</span>
