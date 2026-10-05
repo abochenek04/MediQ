@@ -1,4 +1,50 @@
-# MediQ upgrade verification
+# Healthcare-service upgrade verification
+
+Verified October 4–5, 2026 on `codex/mediq-healthcare-upgrade`, starting from clean `ddc4786`. Node 23.11.0 and Chromium were used locally; Node 24 LTS is recommended. No production publishing, real sender configuration, environment-secret changes or existing database migration was performed. Every database mutation in tests targets a disposable temporary database or `.data/e2e`.
+
+The current [requirement checklist](healthcare-upgrade-checklist.md) records implementation locations, compatibility changes and external owner actions. Baseline passed: typecheck, npm test, 6 backend groups, 7 browser suites. Logs are `/private/tmp/mediq-baseline/`.
+
+## Final results
+
+| Command | Final result |
+|---|---|
+| `npm run typecheck` | PASS: frontend/backend/configuration/tests |
+| `npm test` | PASS: translation/palette audits, build and all original smoke assertions |
+| `npm run test:i18n` (within npm test) | PASS: 592 keys ×6 translated catalogs; placeholders and new dynamic labels audited |
+| `npm run test:palette` (within npm test) | PASS: 13 text pairs; minimum 5.41:1; actual button CSS also checked in Chromium |
+| `npm run test:backend` | PASS: 12 integration groups, original six plus healthcare six |
+| `npm run test:browser` | PASS: 16 Chromium interaction suites, original seven plus healthcare nine |
+| `npm run build:staging` | PASS: backend mode forced, internal administration chunk present |
+| `npm run build:production` | PASS: backend mode forced, internal administration chunk and protected endpoint code absent |
+| `git diff --check` | PASS: no whitespace errors |
+
+The final full suite passed after the reporting-boundary and evidence-contrast fixes; an additional focused three-suite visual/evidence run also passed. Generated tracked build/cache artifacts were restored to the clean baseline to keep the source diff reviewable; rebuild `dist` before a static preview or release.
+
+Complete final logs are `/private/tmp/mediq-healthcare-final/`. Existing non-failing >500kB bundle-size, SQLite experimental and terminal-color warnings were not suppressed. No final automated check failed. During implementation, failures identified missing select accessible names, a missed Urgent Care label, a mobile fixed-font override and test locator/expected-number mistakes; these were fixed, with original coverage retained.
+
+## Substantial behavior verified
+
+- Legacy 001-schema upgrade and pre-migration backup: exact canonical kg/cm and prior reports retained, gender actually removed, previous accounts complete, repeat migration idempotent. Backup preserves the old schema without applying 002 and refuses overwriting an existing snapshot.
+- Real Better Auth signup/verification/automatic session, immediate tour, atomic claim across devices, persisted dismissal, returning-login non-replay/manual replay; first-name long truncation and account/session race isolation.
+- Homepage search button above fold at 320/390/768/1440; stable urgent machine values, care categories/location, preserved symptom concepts and typo tolerance, diagnosis/emergency/insurance notices, all strict existing and accessibility filters, list/map consistency and honest empty/error states.
+- Stage label/time grouping at four widths ×seven languages/RTL; four fills, localized labels/values and accessible names; distinct patterns/shapes. Protanopia, deuteranopia, tritanopia and grayscale screenshots were reviewed; 200% body text/reflow and reduced-motion behavior checked.
+- Actual contributing count/timestamps derived from accepted retained reports in backend output. Ongoing/outlier/stale/sparse cases; real unavailable UI hides stages/ranges. Minute aging tested with a controlled browser clock, including Arabic formatting.
+- Full/quick ongoing reports remain separate from completed visits. Dropdown times, explicit midnight flag/order rejection, a completed 24-hour visit, client/server calendar-date differences, normalized empty optional context, unknown fields/mode accepted through API/feed, SQL ongoing total NULL, mode-specific estimator never guesses an unknown mode.
+- Empty guest plans on session/reload/new tab; user-created plans still work. Settings dropdowns and clear; imperial conversion and no drift across saves, including existing minimum/maximum kg values and a non-rounded cm value. Profile values remain private.
+- Dedicated footer accessibility/policy pages and old anchors; working feedback submission/database record/admin-only reads; strict tri-state editor correction validation/audit; all 16 founder tasks persist.
+- Original authentication recovery/expiry/rate limits, account deletion, cross-tab logout, permission/environment boundaries, job retry/retention/backup restoration, geolocation/manual fallback, profiles/providers/reviews/charts, planning and direct routes remain covered by original suites.
+
+Screenshots under ignored `test-results/`: `healthcare-homepage.png`, `healthcare-stages-{320,390,768,1440}.png`, and `healthcare-colors-{protanopia,deuteranopia,tritanopia,achromatopsia}.png`. Browser HTML results are in ignored `playwright-report/`. API tests use real server/auth/SQLite handlers; only targeted UI freshness cases use controlled API fixtures, backed by separate actual API evidence tests.
+
+## Unverified / external
+
+Real provider email delivery, cloud hosting/secrets/domain setup, licensed directory/accessibility sources, ratings/travel/booking/notification vendors and human assistive-technology/native-speaker reviews remain owner/provider work. Browser accessible-name/focus/keyboard checks are not a human screen-reader certification. No formal conformance or calibrated clinical reliability is claimed. See the four release-specific founder tasks and the existing platform launch backlog.
+
+The historical platform notes below are retained as prior-release evidence. Their old palette, key counts, suite counts and font behavior are superseded by the current release above.
+
+---
+
+# Earlier platform verification — September 28, 2026
 
 Verified locally on September 28, 2026 on branch `codex/mediq-platform-upgrade`. No production service, cloud database, domain or email sender was changed.
 

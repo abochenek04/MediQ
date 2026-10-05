@@ -1,3 +1,4 @@
+import { demoAccessibility } from '../utils/accessibility';
 import type {
   Clinic,
   HistoricalWaitRecord,
@@ -581,7 +582,10 @@ export const clinics: Clinic[] = [
 
 // Clinic ratings derive from the existing fictional clinic reviews, not provider scores.
 // A future adapter can populate the same structure with an attributed source.
-for (const clinic of clinics) {
+for (const [index, clinic] of clinics.entries()) {
+  clinic.fictional = true;
+  clinic.accessibility = demoAccessibility(index);
+  for (const value of clinic.estimates) value.provenance = {calculatedAt: null, evidenceUpdatedAt: null, fictional: true, sources: [{kind: 'fictional-model'}]};
   if (clinic.reviews.length) clinic.rating = {
     rating: Math.round(clinic.reviews.reduce((sum, review) => sum + review.overall, 0) / clinic.reviews.length * 10) / 10,
     reviewCount: clinic.reviews.length,

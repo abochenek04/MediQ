@@ -1,7 +1,8 @@
-import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { DatabaseSync, backup } from 'node:sqlite';
+import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, resolve, sep } from 'node:path';
 import type { ServerConfig } from './config.ts';
+import { accessibilityKeys } from '../src/types.ts';
 import type { Clinic } from '../src/types.ts';
 export type DB = DatabaseSync;
 export function openDatabase(config: ServerConfig) {
@@ -34,8 +35,26 @@ export function countEvent(db: DB, metric: string, now = Date.now()) {
 export function writeClinic(db: DB, clinic: Clinic, fictional = true) {
  db.prepare('INSERT INTO clinics VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET document=excluded.document, updated_at=excluded.updated_at').run(clinic.id, JSON.stringify(clinic),Date.now());
  for (const table of ['providers','clinic_languages','clinic_insurance']) db.prepare(`DELETE FROM ${table} WHERE clinic_id=?`).run(clinic.id);
+ db.prepare('DELETE FROM clinic_accessibility WHERE clinic_id=?').run(clinic.id);
+ for (const key of accessibilityKeys) db.prepare('INSERT INTO clinic_accessibility VALUES (?,?,?)').run(clinic.id,key,clinic.accessibility?.[key] || 'unknown');
  for (const provider of clinic.providers) db.prepare('INSERT INTO providers VALUES (?,?,?)').run(provider.id,clinic.id,JSON.stringify(provider));
  for (const language of clinic.languages) db.prepare('INSERT INTO clinic_languages VALUES (?,?)').run(clinic.id,language);
  for (const insurance of clinic.insurance) db.prepare('INSERT INTO clinic_insurance VALUES (?,?)').run(clinic.id,insurance);
  db.prepare('INSERT INTO source_metadata VALUES (?,?,?,?) ON CONFLICT(clinic_id) DO UPDATE SET source=excluded.source,fictional=excluded.fictional,refreshed_at=excluded.refreshed_at').run(clinic.id,fictional?'MediQ fictional fixtures':'Authorized directory adapter',Number(fictional),Date.now());
+}
+
+// Backups must precede schema migration, especially the requested gender-data deletion.
+export async function backupDatabase(config:ServerConfig,destination:string) {
+ const target=resolve(destination);
+ if(existsSync(target))throw new Error('Choose a new backup path; existing backups are never overwritten');
+ for(const root of ['dist','public'].map(name=>resolve(name)))if(target===root||target.startsWith(root+sep))throw new Error('Store backups outside public/static files');
+ process.umask(0o077);
+ const source=new DatabaseSync(config.database,{readOnly:true});
+ try{
+  if(source.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='environment'").get()){
+   const environment=source.prepare('SELECT name FROM environment WHERE id=1').get()?.name;
+   if(environment&&environment!==config.environment)throw new Error('Database environment mismatch');
+  }
+  await backup(source,target);
+ }finally{source.close();}
 }

@@ -11,7 +11,7 @@ export function makeAuth(db: DB, config: ServerConfig) {
   appName: 'MediQ', baseURL: config.origin, basePath: '/api/auth', secret: config.secret,
   database: db, trustedOrigins: [config.origin],
   emailAndPassword: { enabled: true, requireEmailVerification: true, autoSignIn: false, minPasswordLength: 12, maxPasswordLength: 128, revokeSessionsOnPasswordReset: true },
-  emailVerification: { autoSignInAfterVerification: false },
+  emailVerification: { autoSignInAfterVerification: true },
   session: { expiresIn: 60*60*24*30, updateAge: 60*60*24, freshAge: 300, cookieCache: { enabled: false } },
   user: { additionalFields: { firstName: { type: 'string', required: true }, lastName: { type: 'string', required: true } } },
   advanced: { useSecureCookies: config.origin.startsWith('https:'), ipAddress: { disableIpTracking: true }, defaultCookieAttributes: { httpOnly: true, sameSite: 'lax', path: '/' } },
@@ -19,7 +19,7 @@ export function makeAuth(db: DB, config: ServerConfig) {
   rateLimit: { enabled: false },
   databaseHooks: { user: { update: { after: async user => {
    if (user.emailVerified) {
-    const result = db.prepare('INSERT OR IGNORE INTO account_metadata VALUES (?,?)').run(user.id,Date.now());
+    const result = db.prepare("INSERT OR IGNORE INTO account_metadata(user_id,verified_at,tour_state) VALUES (?,?,'pending')").run(user.id,Date.now());
     if (result.changes) countEvent(db,'verified_signups');
    }
   } } }, session: { create: { before: async session => {

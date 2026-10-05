@@ -50,7 +50,7 @@ test('real auth lifecycle, private ownership, atomic deletion and durable reopen
   assert.equal((await a.call(`/api/saved-clinics/${clinics[0].id}`,'PUT')).status,200);
   assert.equal((await b.call(`/api/plans/${plan.id}`)).status,404);
   assert.equal((await guest.call(`/api/plans/${plan.id}`)).status,401);
-  assert.equal((await a.call('/api/profile','PUT',{firstName:'Alice',lastName:'Example',sex:null,gender:null,weightKg:65,heightCm:null,age:null,language:'pl',notifications:false})).status,200);
+  assert.equal((await a.call('/api/profile','PUT',{firstName:'Alice',lastName:'Example',sex:null,weightKg:65,heightCm:null,age:null,language:'pl',notifications:false})).status,200);
   assert.equal((await a.call('/api/me')).data.profile.weightKg,65);
   assert.equal((await a.call('/api/preferences','PUT',{language:'hi'},{'x-mediq-account':'other'})).status,409);
   await a.call('/api/auth/sign-out','POST');assert.equal((await a.call('/api/me')).data.user,null);
