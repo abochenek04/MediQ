@@ -12,7 +12,7 @@ export function LogoMark({ size = 38 }: { size?: number }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect width="48" height="48" rx="12" fill="#2e9fe5" />
+      <rect width="48" height="48" rx="12" fill="var(--primary-tint)" />
       <circle cx="21" cy="22" r="12.5" fill="#fff5ee" stroke="#123e5d" strokeWidth="2.5" />
       <path d="M21 12.5V15.5M30.5 22H27.5M21 31.5V28.5" stroke="#123e5d" strokeWidth="2.5" strokeLinecap="round" />
       <path d="M21 22L16.8 17.8M21 22L20 27.2" stroke="#123e5d" strokeWidth="2.3" strokeLinecap="round" />

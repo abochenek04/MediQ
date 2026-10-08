@@ -15,14 +15,14 @@ import { useApp } from '../context/AppContext';
 import type { Clinic, HistoricalWaitRecord, LiveWaitEstimate, VisitMode } from '../types';
 import { Link } from '../utils/navigation';
 import { QuickReport } from './QuickReport';
-import { ReliabilityBadge } from './UI';
+import { EstimateEvidence, ConceptHelp, hasEstimate } from './CareInformation';
 
-export const formatMode = (mode: VisitMode) =>
-  mode === 'walk-in' ? 'Walk-in' : mode === 'urgent' ? 'Urgent visit' : 'Scheduled';
+export const formatMode = (mode: VisitMode | null) =>
+  mode === null ? 'Visit type unknown' : mode === 'walk-in' ? 'Walk-in' : mode === 'urgent' ? 'Urgent Care' : 'Scheduled';
 
 export function VisitBreakdown({ estimate, compact = false }: { estimate: LiveWaitEstimate; compact?: boolean }) {
-  const { t } = useApp();
-  const palette = ['#d1601a', '#2e9fe5', '#376b91', '#68b7d6'];
+  const { t, language } = useApp();
+  const palette = ['var(--stage-check-in)', 'var(--stage-wait)', 'var(--stage-care)', 'var(--stage-check-out)'];
   return (
     <div className={compact ? 'visit-breakdown compact' : 'visit-breakdown'}>
       <div className="stage-bar" aria-hidden="true">
@@ -38,10 +38,10 @@ export function VisitBreakdown({ estimate, compact = false }: { estimate: LiveWa
       </div>
       <div className="stage-labels" aria-label={t("Estimated visit stages")}>
         {estimate.stages.map((stage, index) => (
-          <div key={stage.label} title={t(stage.label)}>
+          <div className="stage-pair" key={stage.label} aria-label={t('{label}: {minutes} min',{label:t(stage.shortLabel),minutes:stage.minutes})}>
             <span className="stage-key" style={{ backgroundColor: palette[index] }} />
             <span>{t(stage.shortLabel)}</span>
-            <strong>{stage.minutes}m</strong>
+            <strong>{new Intl.NumberFormat(language).format(stage.minutes)} {t('min')}</strong>
           </div>
         ))}
       </div>
@@ -60,7 +60,7 @@ export function ClinicCard({
   selected?: boolean;
   onSelect?: () => void;
 }) {
-  const { savedClinicIds, toggleSavedClinic, t } = useApp();
+  const { savedClinicIds, toggleSavedClinic, t, language } = useApp();
   const [reportOpen, setReportOpen] = useState(false);
   const isSaved = savedClinicIds.includes(clinic.id);
   const estimate =
@@ -106,28 +106,27 @@ export function ClinicCard({
 
       <div className="estimate-panel" data-tour="estimates">
         <div>
-          <span className="estimate-label">{t("Demo total visit estimate")}</span>
-          <strong className="estimate-number">{estimate.totalMinutes}<small> {t("min")}</small></strong>
-          <span className="estimate-range">{t('Usually {low}–{high} min', { low: estimate.range[0], high: estimate.range[1] })}</span>
+          <span className="estimate-label">{t(estimate.provenance?.fictional?'Fictional reference estimate':'Estimated total visit time')}</span><ConceptHelp label="About visit estimates" text="The estimated total time from arrival to departure, including check-in, waiting, care and check-out."/>
+          <strong className={hasEstimate(estimate)?'estimate-number':'estimate-number estimate-unavailable'}>{hasEstimate(estimate)?new Intl.NumberFormat(language).format(estimate.totalMinutes):t('Unavailable')}{hasEstimate(estimate)&&<small> {t("min")}</small>}</strong>
+          {hasEstimate(estimate)&&<span className="estimate-range">{t('Usually {low}–{high} min', { low: estimate.range[0], high: estimate.range[1] })}</span>}
         </div>
         <div className="estimate-context">
           <span className="mode-pill">{t(formatMode(estimate.mode))}</span>
-          <span className="updated"><Clock3 aria-hidden="true" /> {t('Updated {minutes}m ago', { minutes: estimate.updatedMinutesAgo })}</span>
-          <ReliabilityBadge score={(estimate.reliability || clinic.reliability).score} level={(estimate.reliability || clinic.reliability).level} />
+          <EstimateEvidence estimate={estimate}/>
         </div>
       </div>
 
-      <VisitBreakdown estimate={estimate} compact />
+      {hasEstimate(estimate)&&<VisitBreakdown estimate={estimate} compact />}
 
       <div className="clinic-supporting">
-        {clinic.rating && <span><Star aria-hidden="true" /> {clinic.rating.rating.toFixed(1)} · {clinic.rating.reviewCount} {t('sample reviews')}</span>}
+        {clinic.rating && <span className="patient-rating">{t('Patient experience')} · <Star aria-hidden="true" /> {clinic.rating.rating.toFixed(1)} · {clinic.rating.reviewCount} {t('sample reviews')}</span>}
         <span><Languages aria-hidden="true" /> {clinic.languages.join(' · ')}</span>
-        <span><MessageSquarePlus aria-hidden="true" /> {t('{count} recent reports', { count: estimate.contributingReports })}</span>
+
       </div>
 
       <div className="clinic-card-actions">
         <button className="button button-secondary" type="button" onClick={() => setReportOpen(true)}>
-          {t('Report a wait')}
+          {t('Report a Wait')}
         </button>
         <Link className="button button-primary" to={`/clinic/${clinic.id}`}> {t("View clinic")} <ArrowRight aria-hidden="true" />
         </Link>
@@ -179,7 +178,7 @@ export function MapView({
               aria-label={t('{clinic}, {minutes} minute {mode} estimate', {clinic: clinic.name, minutes: estimate.totalMinutes, mode: t(formatMode(estimate.mode))})}
               aria-pressed={selected.id === clinic.id}
             >
-              <span>{estimate.totalMinutes}m</span>
+              <span>{hasEstimate(estimate)?t('{minutes} min',{minutes:estimate.totalMinutes}):t('Unavailable')}</span>
               <i aria-hidden="true">{index + 1}</i>
             </button>
           );
@@ -187,11 +186,11 @@ export function MapView({
         <div className="map-legend"><span className="demo-dot" /> {t("Stylized prototype map")}</div>
       </div>
       <aside className="map-side-list" aria-label={t("Map results")}>
-        <p className="map-result-count">{clinics.length} nearby options</p>
+        <p className="map-result-count">{t('{count} care options',{count:clinics.length})}</p>
         {clinics.map((clinic, index) => {
           const estimate = clinic.estimates.find((item) => item.mode === preferredMode) || clinic.estimates[0];
           return (
-            <button
+            <div key={clinic.id}><button
               className={selected.id === clinic.id ? 'map-list-item selected' : 'map-list-item'}
               key={clinic.id}
               type="button"
@@ -202,8 +201,8 @@ export function MapView({
                 <strong>{clinic.name}</strong>
                 <small>{clinic.distanceMiles.toFixed(1)} mi · {t(formatMode(estimate.mode))}</small>
               </span>
-              <b>{estimate.totalMinutes}m</b>
-            </button>
+              <b>{hasEstimate(estimate)?t('{minutes} min',{minutes:estimate.totalMinutes}):t('Unavailable')}</b>
+            </button><EstimateEvidence estimate={estimate}/></div>
           );
         })}
         <Link className="button button-primary button-full" to={`/clinic/${selected.id}`}>

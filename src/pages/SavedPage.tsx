@@ -12,6 +12,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { EstimateEvidence, ConceptHelp, hasEstimate } from '../components/CareInformation';
 import { DemoBadge, SafetyNote } from '../components/UI';
 import { useApp } from '../context/AppContext';
 import { clinicService } from '../services/clinicService';
@@ -78,7 +79,7 @@ export function SavedPage() {
                     </div>
                     <div className="appointment-identity">
                       <div className="title-kicker-row">
-                        <span className="mode-pill">{appointment.visitMode === 'walk-in' ? t("Walk-in plan") : appointment.visitMode === 'urgent' ? t("Urgent visit plan") : t("Scheduled visit")}</span>
+                        <span className="mode-pill">{appointment.visitMode === 'walk-in' ? t("Walk-in plan") : appointment.visitMode === 'urgent' ? t("Urgent Care plan") : t("Scheduled visit")}</span>
                         {appointment.isSample && <span className="sample-chip">{t("Sample")}</span>}
                       </div>
                       <h2>{clinic.name}</h2>
@@ -87,11 +88,12 @@ export function SavedPage() {
                     </div>
                     <div className="appointment-live">
                       <span>{t("Current demo estimate")}</span>
-                      <strong>{plan.estimate.totalMinutes} {t("min")}</strong>
-                      <small>{t("Updated")} {plan.estimate.updatedMinutesAgo}{t("m ago")}</small>
+                      <strong>{hasEstimate(plan.estimate)?new Intl.NumberFormat(language).format(plan.estimate.totalMinutes):t('Unavailable')} {hasEstimate(plan.estimate)&&t('min')}</strong>
+                      <EstimateEvidence estimate={plan.estimate}/>
                     </div>
                   </div>
 
+                  <ConceptHelp label="About leave-by time" text="Subtract your travel time and arrival buffer from the planned visit time."/><ConceptHelp label="About expected finish" text="The planned start plus the estimated visit duration. Actual care may finish earlier or later."/>
                   <div className="plan-timeline" aria-label={t('Visit planning timeline')}>
                     <div className="plan-stop leave-stop">
                       <span className="plan-stop-icon"><Navigation aria-hidden="true" /></span>
@@ -107,17 +109,17 @@ export function SavedPage() {
                       <span className="plan-stop-icon"><Clock3 aria-hidden="true" /></span>
                       <span><small>{t("Visit begins")}</small><strong>{formatTime(appointment.appointmentTime)}</strong></span>
                     </div>
-                    <div className="plan-connector visit"><span /><small>{t("about")} {plan.estimate.totalMinutes} {t("min")}</small></div>
+                    <div className="plan-connector visit"><span /><small>{t("about")} {hasEstimate(plan.estimate)?new Intl.NumberFormat(language).format(plan.estimate.totalMinutes):t('Unavailable')} {hasEstimate(plan.estimate)&&t('min')}</small></div>
                     <div className="plan-stop finish-stop">
                       <span className="plan-stop-icon"><Check aria-hidden="true" /></span>
-                      <span><small>{t("Likely finish")}</small><strong>{formatTime(plan.likelyFinish.toISOString())}</strong></span>
+                      <span><small>{t("Likely finish")}</small><strong>{plan.likelyFinish?formatTime(plan.likelyFinish.toISOString()):t('Unavailable')}</strong></span>
                     </div>
                   </div>
 
                   <div className="plan-explanation">
                     <div><Car aria-hidden="true" /><span><strong>{appointment.travelMinutes} {t("min")}</strong><small>{t("Simulated travel")}</small></span></div>
                     <div><Route aria-hidden="true" /><span><strong>{appointment.bufferMinutes} {t("min")}</strong><small>{t("Your arrival buffer")}</small></span></div>
-                    <div><ShieldCheck aria-hidden="true" /><span><strong>{clinic.reliability.score}% · {clinic.reliability.level}</strong><small>{t("Estimate confidence")}</small></span></div>
+                    <div><ShieldCheck aria-hidden="true" /><span><strong>{t((plan.estimate.reliability||clinic.reliability).level)}</strong><small>{t("Estimate confidence")}</small></span></div>
                   </div>
 
                   <div className="appointment-note">
@@ -148,7 +150,7 @@ export function SavedPage() {
               {savedClinics.map((clinic) => (
                 <article key={clinic.id}>
                   <div className="saved-clinic-icon" style={{ background: `${clinic.accent}22`, color: clinic.accent }}><Bookmark aria-hidden="true" fill="currentColor" /></div>
-                  <div><span>{clinic.type}</span><h3>{clinic.name}</h3><p>{clinic.distanceMiles.toFixed(1)} mi · {clinic.estimates[0].totalMinutes} {t("min demo visit")}</p></div>
+                  <div><span>{clinic.type}</span><h3>{clinic.name}</h3><p>{clinic.distanceMiles.toFixed(1)} mi · {hasEstimate(clinic.estimates[0])?new Intl.NumberFormat(language).format(clinic.estimates[0].totalMinutes):t('Unavailable')} {hasEstimate(clinic.estimates[0])&&t('min')}</p><EstimateEvidence estimate={clinic.estimates[0]}/></div>
                   <Link to={`/clinic/${clinic.id}`} aria-label={t('View {clinic}', { clinic: clinic.name })}><ArrowRight aria-hidden="true" /></Link>
                   <button type="button" onClick={() => toggleSavedClinic(clinic.id)}>{t("Remove")}</button>
                 </article>

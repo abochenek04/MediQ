@@ -2,6 +2,10 @@ import { clinics } from '../src/data/mockData.ts';
 import { transaction, writeClinic, type DB } from './database.ts';
 import type { ServerConfig } from './config.ts';
 const tasks = [
+ ['accessibility','Source real accessibility data','Unknown services must never be advertised as available.','Confirm all seven accessibility attributes with each clinic and record permission and update dates.','Compare approved clinic evidence with strict filters and profile unknown states.'],
+ ['fonts','Review font licenses','Self-hosted fonts need their licenses and attribution.','Review the bundled OFL licenses and record approval for Source Sans 3 and Noto companions.','Confirm each shipped font has its original license and no proprietary assets are used.'],
+ ['new-translations','Review healthcare translations','New safety and reporting copy must be clear in every language.','Have native speakers review all new copy in seven languages, including RTL and long layouts.','Record reviewers and resolve findings in the translated interaction tests.'],
+ ['provenance','Authorize estimate evidence sources','Only contributed sources may appear in provenance.','Obtain licensed clinic timing feeds and document their timestamps, sample counts and refresh contract.','Verify source attribution against estimator inputs in staging before claiming clinic-provided evidence.'],
  ['cloud','Separate cloud services','Isolation prevents test data entering production.','Create staging and production services with separate disks, secrets and email sender configuration.','Both /api/health endpoints show their intended environment.'],
  ['email','Verify the email sender','Accounts require working verification and recovery email.','Verify a Resend sender domain; configure MAIL_FROM and RESEND_API_KEY in each service.','Complete signup, resend and recovery from an external mailbox.'],
  ['directory','Obtain real clinic and provider data','Current clinics and people are fictional.','Obtain directory permission, source attribution, update cadence and reviewed capability lists.','Review approved imported records and source metadata in staging.'],
@@ -18,5 +22,9 @@ const tasks = [
 export function seedTasks(db: DB) { for (const [id,title,why,action,verification] of tasks) db.prepare('INSERT OR IGNORE INTO launch_tasks(id,title,why,action,verification,guide) VALUES (?,?,?,?,?,?)').run(id,title,why,action,verification,'/docs/runbook.md'); }
 export function seedDemo(db: DB, config: ServerConfig) {
  if (!['development','test','staging'].includes(config.environment)) throw new Error('Fictional seed is forbidden in production');
- transaction(db,()=> { for (const clinic of clinics) if (!db.prepare('SELECT id FROM clinics WHERE id=?').get(clinic.id)) writeClinic(db,clinic); seedTasks(db); });
+ transaction(db,()=> { for (const clinic of clinics) {
+   const existing=db.prepare('SELECT document FROM clinics WHERE id=?').get(clinic.id);
+   if(!existing)writeClinic(db,clinic);
+   else if(!JSON.parse(existing.document as string).accessibility&&db.prepare('SELECT fictional FROM source_metadata WHERE clinic_id=?').get(clinic.id)?.fictional)writeClinic(db,{...JSON.parse(existing.document as string),accessibility:clinic.accessibility});
+  } seedTasks(db); });
 }

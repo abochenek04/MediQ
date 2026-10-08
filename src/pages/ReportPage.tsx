@@ -13,6 +13,9 @@ import {
   UserRoundCheck,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { TimePicker } from '../components/TimePicker';
+import { EmergencyNotice, ConceptHelp } from '../components/CareInformation';
+import { insurancePlans, clinicLanguageOptions } from '../data/mockData';
 import { DemoBadge, InfoNote, SafetyNote } from '../components/UI';
 import { useApp } from '../context/AppContext';
 import { backendEnabled } from '../services/api';
@@ -30,6 +33,8 @@ export function ReportPage() {
   const [retry, setRetry] = useState(0);
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [draft, setDraft] = useState<WaitReportDraft>(() => initialDraft(queryClinicId));
+  const [reportKind,setReportKind]=useState<'completed-visit'|'current-wait'>('completed-visit');
+  const [elapsed,setElapsed]=useState('');
   const [durationMode, setDurationMode] = useState<'exact' | 'range'>('exact');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -44,7 +49,7 @@ export function ReportPage() {
       if (!active) return;
       setClinics(items);
       const selected = items.find((clinic) => clinic.id === queryClinicId);
-      if (selected && !selected.visitModes.includes(draft.visitMode)) {
+      if (selected && draft.visitMode!==null && !selected.visitModes.includes(draft.visitMode)) {
         setDraft((current) => ({ ...current, visitMode: selected.visitModes[0] }));
       }
     }, () => { if (active) setLoadError(true); });
@@ -69,34 +74,32 @@ export function ReportPage() {
     setDraft((current) => ({
       ...current,
       clinicId,
-      visitMode: clinic?.visitModes.includes(current.visitMode) ? current.visitMode : clinic?.visitModes[0] || 'scheduled',
+      visitMode: current.visitMode===null?null:clinic?.visitModes.includes(current.visitMode)?current.visitMode:null,
     }));
   };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (submitting) return;
-    const nextErrors = validateReport(draft, durationMode);
+    const nextErrors = validateReport({...draft,elapsedMinutes:elapsed===''?undefined:Number(elapsed)},reportKind==='current-wait'?'current':durationMode,false);
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
       window.setTimeout(() => errorRef.current?.focus(), 0);
       return;
     }
     setSubmitting(true);
-    const payload = durationMode === 'range'
-      ? { ...draft, arrivalTime: '', checkInTime: '', providerTime: '', departureTime: '' }
-      : { ...draft, totalRange: '' };
+    const payload = reportKind==='current-wait'?{...draft,reportKind,elapsedMinutes:Number(elapsed),arrivalTime:null,checkInTime:null,providerTime:null,departureTime:null,totalRange:''}:durationMode==='range'?{...draft,reportKind,arrivalTime:null,checkInTime:null,providerTime:null,departureTime:null}:{...draft,reportKind,totalRange:''};
     try {
       const result = await submitReport(payload);
-      setConfirmation({ totalMinutes: result.totalMinutes, clinicId: result.clinicId, review: result.moderationStatus === 'review' });
+      setConfirmation({ totalMinutes: result.reportKind==='current-wait'?result.elapsedMinutes||0:result.totalMinutes, clinicId: result.clinicId, review: result.moderationStatus === 'review' });
     } catch {
       setErrors({ submit: 'Your report could not be saved. Please try again.' });
       window.setTimeout(() => errorRef.current?.focus(), 0);
     } finally { setSubmitting(false); }
   };
 
-  const reset = () => {
-    setDraft({ ...initialDraft(queryClinicId), visitMode: clinics.find(c => c.id === queryClinicId)?.visitModes[0] || 'scheduled' });
+  const reset = () => {setReportKind('completed-visit');setElapsed('');
+    setDraft({ ...initialDraft(queryClinicId), visitMode:null });
     setDurationMode('exact');
     setErrors({});
     setConfirmation(null);
@@ -115,7 +118,7 @@ export function ReportPage() {
               {t('Report saved for {clinic}: {minutes} minutes.', { clinic: clinic?.name || '', minutes: confirmation.totalMinutes })}
             </p>
             <div className="confirmation-summary">
-              <div><Clock3 aria-hidden="true" /><span><strong>{confirmation.totalMinutes} {t("min")}</strong><small>{t("Reported total visit")}</small></span></div>
+              <div><Clock3 aria-hidden="true" /><span><strong>{confirmation.totalMinutes} {t("min")}</strong><small>{t(reportKind==='current-wait'?'Minutes waiting so far':'Reported total visit')}</small></span></div>
               <div><ShieldCheck aria-hidden="true" /><span><strong>{draft.anonymous ? t("Anonymous") : t("Source labeled")}</strong><small>{t("Reporting preference")}</small></span></div>
               <div><LockKeyhole aria-hidden="true" /><span><strong>{t("No medical details")}</strong><small>{t("Operational data only")}</small></span></div>
             </div>
@@ -137,7 +140,7 @@ export function ReportPage() {
         <div className="report-heading">
           <div>
             <span className="eyebrow">{t("About one minute")}</span>
-            <h1>{t("Report your visit")}</h1>
+            <h1>{t("Report a Wait")}</h1>
             <p>{t("Your timing helps make the next person’s day easier. Share only operational details—never diagnoses or medical records.")}</p>
           </div>
           <div className="report-time-badge"><Timer aria-hidden="true" /><span><strong>{t("≈ 1 minute")}</strong><small>{t("7 quick answers")}</small></span></div>
@@ -147,6 +150,7 @@ export function ReportPage() {
         <div className="journey-strip" aria-label={t('Visit stages')}>
           {['Check in', 'Wait', 'Care', 'Check out'].map((stage, index) => <span key={stage}><b>{index + 1}</b>{t(stage)}</span>)}
         </div>
+        <fieldset className="choice-fieldset report-kind"><legend>{t('What would you like to report?')}</legend><div className="choice-row"><label><input type="radio" name="full-report-kind" checked={reportKind==='current-wait'} onChange={()=>{setReportKind('current-wait');setErrors({});}}/><span><strong>{t("I'm here now")}</strong><small>{t('Report the current wait')}</small></span></label><label><input type="radio" name="full-report-kind" checked={reportKind==='completed-visit'} onChange={()=>{setReportKind('completed-visit');setErrors({});}}/><span><strong>{t('I already finished my visit')}</strong><small>{t('Report the total visit duration')}</small></span></label></div></fieldset><ConceptHelp label="About Report a Wait" text="Share an ongoing wait or a completed visit duration. Ongoing waits never count as completed visits."/><EmergencyNotice/>
         <form className="report-form" onSubmit={handleSubmit} noValidate>
           {Object.keys(errors).length > 0 && (
             <div className="form-error-summary" role="alert" tabIndex={-1} ref={errorRef}>
@@ -160,7 +164,6 @@ export function ReportPage() {
             <div className="form-section-content">
               <div className="form-section-heading">
                 <div><h2 id="visit-basics-title">{t("Which visit?")}</h2><p>{t("Choose a clinic and the kind of visit.")}</p></div>
-                <span>{t("Required")}</span>
               </div>
               <div className="form-grid two-col">
                 <label className="field-label">
@@ -179,11 +182,11 @@ export function ReportPage() {
               </div>
               <fieldset className="choice-fieldset">
                 <legend>{t("Visit type")}</legend>
-                <div className="choice-row compact-choices">
+                <div className="choice-row compact-choices"><label><input type="radio" name="report-visit-mode" checked={draft.visitMode===null} onChange={()=>updateDraft('visitMode',null)}/><span>{t("I don't remember / I don't know")}</span></label>
                   {(selectedClinic?.visitModes || ['scheduled', 'walk-in', 'urgent']).map((visitMode) => (
                     <label key={visitMode}>
                       <input type="radio" name="report-visit-mode" value={visitMode} checked={draft.visitMode === visitMode} onChange={() => updateDraft('visitMode', visitMode)} />
-                      <span>{visitMode === 'walk-in' ? t("Walk-in") : visitMode === 'urgent' ? t("Urgent visit") : t("Scheduled")}</span>
+                      <span>{visitMode === 'walk-in' ? t("Walk-in") : visitMode === 'urgent' ? t("Urgent Care") : t("Scheduled")}</span>
                     </label>
                   ))}
                 </div>
@@ -196,23 +199,15 @@ export function ReportPage() {
             <div className="form-section-content">
               <div className="form-section-heading">
                 <div><h2 id="visit-time-title">{t("How long did it take?")}</h2><p>{t("Check in → Wait → Care → Check out. Approximate times are fine.")}</p></div>
-                <span>{t("Required")}</span>
               </div>
+              {reportKind==='current-wait'?<label className="field-label"><span>{t('Minutes waiting so far')}</span><input type="number" min="0" max="1440" step="1" value={elapsed} onChange={event=>setElapsed(event.target.value)}/></label>:<>
               <div className="duration-mode-toggle" aria-label={t('How to report visit duration')}>
                 <button type="button" className={durationMode === 'exact' ? 'active' : ''} onClick={() => setDurationMode('exact')} aria-pressed={durationMode === 'exact'}>{t("I know the times")}</button>
                 <button type="button" className={durationMode === 'range' ? 'active' : ''} onClick={() => setDurationMode('range')} aria-pressed={durationMode === 'range'}>{t("Use a total range")}</button>
               </div>
               {durationMode === 'exact' ? (
                 <>
-                  <div className="time-fields">
-                    <label className="field-label"><span>{t("Arrived")}</span><input type="time" value={draft.arrivalTime} onChange={(event) => updateDraft('arrivalTime', event.target.value)} aria-invalid={Boolean(errors.arrivalTime || errors.times)} />{errors.arrivalTime && <small className="field-error">{t(errors.arrivalTime)}</small>}</label>
-                    <span className="time-arrow" aria-hidden="true">→</span>
-                    <label className="field-label"><span>{t("Checked in")} <small>{t("optional")}</small></span><input type="time" value={draft.checkInTime} onChange={(event) => updateDraft('checkInTime', event.target.value)} aria-invalid={Boolean(errors.times)} /></label>
-                    <span className="time-arrow" aria-hidden="true">→</span>
-                    <label className="field-label"><span>{t("Provider arrived")}</span><input type="time" value={draft.providerTime} onChange={(event) => updateDraft('providerTime', event.target.value)} aria-invalid={Boolean(errors.providerTime || errors.times)} />{errors.providerTime && <small className="field-error">{t(errors.providerTime)}</small>}</label>
-                    <span className="time-arrow" aria-hidden="true">→</span>
-                    <label className="field-label"><span>{t('Check out complete')}</span><input type="time" value={draft.departureTime} onChange={(event) => updateDraft('departureTime', event.target.value)} aria-invalid={Boolean(errors.departureTime || errors.times)} />{errors.departureTime && <small className="field-error">{t(errors.departureTime)}</small>}</label>
-                  </div>
+                  <div className="time-fields time-dropdowns"><TimePicker label="Arrived" value={draft.arrivalTime} onChange={value=>updateDraft('arrivalTime',value)} error={errors.arrivalTime||errors.times}/><TimePicker label="Checked in" value={draft.checkInTime} onChange={value=>updateDraft('checkInTime',value)} optional error={errors.times}/><TimePicker label="Provider arrived" value={draft.providerTime} onChange={value=>updateDraft('providerTime',value)} optional error={errors.times}/><TimePicker label="Check out complete" value={draft.departureTime} onChange={value=>updateDraft('departureTime',value)} error={errors.departureTime||errors.times}/></div><label className="check-row"><input type="checkbox" checked={draft.crossesMidnight||false} onChange={event=>updateDraft('crossesMidnight',event.target.checked)}/>{t('Departure was on the next day')}</label>
                   {errors.times && <p className="field-error standalone">{t(errors.times)}</p>}
                 </>
               ) : (
@@ -229,7 +224,7 @@ export function ReportPage() {
                   </select>
                   {errors.totalRange && <small className="field-error">{t(errors.totalRange)}</small>}
                 </label>
-              )}
+              )}</>}
             </div>
           </section>
 
@@ -238,12 +233,13 @@ export function ReportPage() {
             <div className="form-section-content">
               <div className="form-section-heading">
                 <div><h2 id="experience-title">{t("A little context")}</h2><p>{t("This helps people understand more than the minutes.")}</p></div>
-                <span>{t("Required")}</span>
+                <span>{t('optional')}</span>
               </div>
               <fieldset className="choice-fieldset">
                 <legend>{t("Compared with the MediQ estimate, your visit was…")}</legend>
                 <div className="choice-row">
                   {([
+                    ['', "I don't remember / I don't know", 'optional'],
                     ['shorter', 'Shorter', 'Finished sooner'],
                     ['about-right', 'About right', 'Close to estimate'],
                     ['longer', 'Longer', 'Took more time'],
@@ -259,7 +255,7 @@ export function ReportPage() {
 
               <fieldset className="choice-fieldset rating-fieldset">
                 <legend>{t("How clear was communication about delays or next steps?")}</legend>
-                <div className="number-rating">
+                <label className="check-row"><input type="radio" name="communication" checked={!draft.communication} onChange={()=>updateDraft('communication',null)}/>{t("I don't remember / I don't know")}</label><div className="number-rating">
                   {[1, 2, 3, 4, 5].map((value) => (
                     <label key={value}>
                       <input type="radio" name="communication" value={value} checked={draft.communication === value} onChange={() => updateDraft('communication', value)} />
@@ -274,12 +270,13 @@ export function ReportPage() {
               <fieldset className="choice-fieldset">
                 <legend>{t("Did the provider portion of your visit feel rushed?")}</legend>
                 <div className="choice-row compact-choices">
-                  <label><input type="radio" name="rushed" checked={draft.rushed === 'no'} onChange={() => updateDraft('rushed', 'no')} /><span>{t("No")}</span></label>
+                  <label><input type="radio" name="rushed" checked={draft.rushed===''} onChange={()=>updateDraft('rushed','')}/><span>{t("I don't remember / I don't know")}</span></label><label><input type="radio" name="rushed" checked={draft.rushed === 'no'} onChange={() => updateDraft('rushed', 'no')} /><span>{t("No")}</span></label>
                   <label><input type="radio" name="rushed" checked={draft.rushed === 'yes'} onChange={() => updateDraft('rushed', 'yes')} /><span>{t("Yes")}</span></label>
                 </div>
                 {errors.rushed && <small className="field-error">{t(errors.rushed)}</small>}
               </fieldset>
 
+              <div className="field-pair">{(['insurance','language','providerId'] as const).map(key=><label className="field-label" key={key}><span>{t(key==='insurance'?'Insurance':key==='language'?'Language':'Provider')}</span><select aria-label={t(key==='insurance'?'Insurance':key==='language'?'Language':'Provider')} value={draft[key]||''} onChange={event=>updateDraft(key,event.target.value||null)}><option value="">{t("I don't remember / I don't know")}</option>{(key==='insurance'?insurancePlans.map(p=>({value:p.name,label:p.name})):key==='language'?clinicLanguageOptions.map(value=>({value,label:t(value)})):(selectedClinic?.providers||[]).map(p=>({value:p.id,label:p.name}))).map(item=><option key={item.value} value={item.value}>{item.label}</option>)}</select></label>)}</div>
               <label className="field-label note-field">
                 <span>{t("Optional non-medical note")}</span>
                 <textarea maxLength={240} value={draft.note} onChange={(event) => updateDraft('note', event.target.value)} placeholder={t("Example: Staff explained that an emergency changed the timing.")} />

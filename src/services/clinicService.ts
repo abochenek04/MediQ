@@ -32,12 +32,12 @@ export const defaultSearchFilters: SearchFilters = {
   visitMode: 'all', timing: 'all', maxDistance: 10,
 };
 
-const getMinutesBetween = (start: string, end: string) => {
+const getMinutesBetween = (start: string | null, end: string | null, crossesMidnight=false) => {
   if (!start || !end) return 0;
   const [startHour, startMinute] = start.split(':').map(Number);
   const [endHour, endMinute] = end.split(':').map(Number);
   const result = endHour * 60 + endMinute - (startHour * 60 + startMinute);
-  return result < 0 ? result + 24 * 60 : result;
+  return result + (crossesMidnight ? 1440 : 0);
 };
 
 const rangeMidpoint = (range: string) => {
@@ -74,9 +74,9 @@ export const mockClinicService: ClinicDataService = {
     await delay(260);
     const errors = validateReport(draft, draft.reportKind === 'current-wait' ? 'current' : draft.totalRange ? 'range' : 'exact', false);
     const clinic = clinics.find((item) => item.id === draft.clinicId);
-    if (Object.keys(errors).length || !clinic || !clinic.visitModes.includes(draft.visitMode)) throw new Error('Invalid report');
-    const exactMinutes = getMinutesBetween(draft.arrivalTime, draft.departureTime);
-    const totalMinutes = draft.reportKind === 'current-wait' ? 0 : exactMinutes || rangeMidpoint(draft.totalRange);
+    if (Object.keys(errors).length || !clinic || (draft.visitMode !== null && !clinic.visitModes.includes(draft.visitMode))) throw new Error('Invalid report');
+    const exactMinutes = getMinutesBetween(draft.arrivalTime, draft.departureTime, draft.crossesMidnight);
+    const totalMinutes = draft.reportKind === 'current-wait' ? 0 : draft.totalRange ? rangeMidpoint(draft.totalRange) : exactMinutes;
 
     return {
       id: `guest-${crypto.randomUUID()}`,

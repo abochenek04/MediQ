@@ -15,6 +15,9 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { accessibilityKeys } from '../types';
+import { accessibilityLabels } from '../utils/accessibility';
+import { DiagnosisNotice, EmergencyNotice, InsuranceNotice, EstimateEvidence, ConceptHelp, hasEstimate } from '../components/CareInformation';
 import { ClinicCard, MapView } from '../components/ClinicComponents';
 import { DemoBadge, InfoNote, PageLoader, SafetyNote } from '../components/UI';
 import { useApp } from '../context/AppContext';
@@ -31,9 +34,9 @@ type ViewMode = 'list' | 'map';
 type SortMode = 'recommended' | 'distance' | 'shortest' | 'reliability';
 
 export function FindCarePage() {
-  const { savedAppointments, pushToast, t } = useApp();
+  const { savedAppointments, pushToast, t, language } = useApp();
   const initialQuery = new URLSearchParams(window.location.search).get('q') || '';
-  const [filters, setFilters] = useState<SearchFilters>({ ...defaultFilters, query: initialQuery });
+  const [filters, setFilters] = useState<SearchFilters>({ ...defaultFilters, query: initialQuery,location:new URLSearchParams(window.location.search).get('location')||'',specialty:new URLSearchParams(window.location.search).get('specialty')||'',accessibility:[] });
   const [results, setResults] = useState<Clinic[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -86,7 +89,7 @@ export function FindCarePage() {
   const sortedResults = useMemo(() => {
     const copy = [...results];
     if (sort === 'shortest') {
-      return copy.sort((a, b) => (a.estimates.find(e => e.mode === filters.visitMode) || a.estimates[0]).totalMinutes - (b.estimates.find(e => e.mode === filters.visitMode) || b.estimates[0]).totalMinutes);
+      return copy.sort((a, b) => (hasEstimate(a.estimates.find(e=>e.mode===filters.visitMode)||a.estimates[0])?(a.estimates.find(e=>e.mode===filters.visitMode)||a.estimates[0]).totalMinutes:Infinity)-(hasEstimate(b.estimates.find(e=>e.mode===filters.visitMode)||b.estimates[0])?(b.estimates.find(e=>e.mode===filters.visitMode)||b.estimates[0]).totalMinutes:Infinity));
     }
     if (sort === 'reliability') {
       return copy.sort((a, b) => (b.estimates.find(e => e.mode === filters.visitMode)?.reliability || b.reliability).score - (a.estimates.find(e => e.mode === filters.visitMode)?.reliability || a.reliability).score);
@@ -95,7 +98,7 @@ export function FindCarePage() {
   }, [results, sort, filters.timing, filters.visitMode]);
 
   const activeFilterCount = [
-    filters.language,
+    ...(filters.accessibility||[]),filters.location,filters.language,
     filters.minimumRating,
     filters.insurance,
     filters.specialty,
@@ -112,7 +115,7 @@ export function FindCarePage() {
     event.preventDefault();
     const query = filters.query.trim();
     navigate(query ? `/find?q=${encodeURIComponent(query)}` : '/find', { replace: true });
-    document.getElementById('clinic-results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('clinic-results')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
   };
 
   const applyQuickFilter = (key: 'walk-in' | 'scheduled' | 'open' | 'pediatrics' | 'medicaid') => {
@@ -154,13 +157,13 @@ export function FindCarePage() {
         <div className="shell find-hero-inner">
           <div className="find-hero-copy">
             <DemoBadge label={t("Durham demo · fictional data")} />
-            <span className="eyebrow light">{t('heroEyebrow')}</span>
+
             <h1>{t('heroTitle')}</h1>
             <p>{t('heroBody')}</p>
           </div>
 
           <form className="care-search" onSubmit={runSearch} role="search">
-            <label htmlFor="care-search-input">{t("Search for care")}</label>
+            <label htmlFor="care-search-input">{t('What kind of care are you looking for?')}</label>
             <div className="care-search-row">
               <Search aria-hidden="true" />
               <input
@@ -180,6 +183,7 @@ export function FindCarePage() {
               <span><MapPin aria-hidden="true" /> {t(filters.origin ? t("Approximate location · fictional clinics") : t("Near Durham, North Carolina"))}</span>
               <button type="button" disabled={locationBusy} onClick={useLocation}><LocateFixed aria-hidden="true" /> {t(locationBusy ? t("Locating…") : t("Use my location"))}</button>
             </div>
+            <DiagnosisNotice/><EmergencyNotice/>
             <p className="location-status" role="status">{t(locationMessage)} {filters.origin && <button className="text-button" type="button" onClick={() => { locationRequestId.current++; setLocationBusy(false); setFilters(current => ({ ...current, origin: undefined })); setLocationMessage('Demo distances from downtown Durham.'); }}>{t('Use demo location')}</button>}</p>
           </form>
 
@@ -208,12 +212,12 @@ export function FindCarePage() {
             </div>
             <div className="upcoming-plan">
               <div>
-                <span>{t("Suggested leave-by")}</span>
+                <span>{t('Suggested leave-by')}</span><ConceptHelp label="About leave-by time" text="Subtract your travel time and arrival buffer from the planned visit time."/>
                 <strong>{formatTime(upcomingPlan.leaveBy.toISOString())}</strong>
               </div>
               <div>
                 <span>{t("Current visit estimate")}</span>
-                <strong>{upcomingPlan.estimate.totalMinutes} {t("min")}</strong>
+                <strong>{hasEstimate(upcomingPlan.estimate)?new Intl.NumberFormat(language).format(upcomingPlan.estimate.totalMinutes):t('Unavailable')}</strong><EstimateEvidence estimate={upcomingPlan.estimate}/>
               </div>
             </div>
             <Link className="button button-secondary" to="/saved">{t("View plan")} <ArrowRight aria-hidden="true" /></Link>
@@ -229,7 +233,7 @@ export function FindCarePage() {
 
             <label className="field-label">
               <span>{t("Location")}</span>
-              <input aria-label={t("Search location or neighborhood")} placeholder={t("Durham neighborhood or ZIP")} value={filters.query} onChange={event => updateFilter("query", event.target.value)} />
+              <input aria-label={t("Search location or neighborhood")} placeholder={t("Durham neighborhood or ZIP")} value={filters.location||''} onChange={event => updateFilter('location', event.target.value)} />
             </label>
             <label className="field-label">
               <span>{t("Within")}</span>
@@ -244,21 +248,22 @@ export function FindCarePage() {
               </div>
             </label>
             <label className="field-label">
-              <span>{t("Insurance")}</span>
+              <span>{t('Accepted insurance')}</span>
               <div className="select-wrap">
-                <select value={filters.insurance} onChange={(event) => updateFilter('insurance', event.target.value)}>
+                <select aria-label={t('Accepted insurance')} value={filters.insurance} onChange={(event) => updateFilter('insurance', event.target.value)}>
                   <option value="">{t("Any insurance")}</option>
                   {insurancePlans.map((plan) => <option key={plan.id} value={plan.name}>{plan.name}</option>)}
                 </select>
                 <ChevronDown aria-hidden="true" />
               </div>
             </label>
+            <InsuranceNotice/>
             <label className="field-label">
-              <span>{t("Specialty")}</span>
+              <span>{t('Care category')}</span>
               <div className="select-wrap">
-                <select value={filters.specialty} onChange={(event) => updateFilter('specialty', event.target.value)}>
+                <select aria-label={t('Care category')} value={filters.specialty} onChange={(event) => updateFilter('specialty', event.target.value)}>
                   <option value="">{t("Any specialty")}</option>
-                  {specialtyOptions.map((specialty) => <option key={specialty} value={specialty}>{t(specialty)}</option>)}
+                  {specialtyOptions.map((specialty) => <option key={specialty} value={specialty}>{t(specialty==='Urgent care'?'Urgent Care':specialty)}</option>)}
                 </select>
                 <ChevronDown aria-hidden="true" />
               </div>
@@ -275,12 +280,13 @@ export function FindCarePage() {
                 {[3, 3.5, 4, 4.5].map(rating => <option key={rating} value={rating}>{rating}+ / 5</option>)}
               </select><ChevronDown aria-hidden="true" />
             </div><small>{t('Fictional clinic reviews. No Google connection.')}</small></label>
+            <fieldset className="filter-fieldset accessibility-filters"><legend>{t('Clinic accessibility')}</legend>{accessibilityKeys.map(key=><label key={key}><input type="checkbox" checked={filters.accessibility?.includes(key)||false} onChange={event=>updateFilter('accessibility',event.target.checked?[...(filters.accessibility||[]),key]:(filters.accessibility||[]).filter(value=>value!==key))}/><span>{t(accessibilityLabels[key])}</span></label>)}<p>{t('Only listed available services match. Unknown services are excluded. Demo attributes are fictional.')}</p></fieldset>
             <fieldset className="filter-fieldset">
               <legend>{t("Visit type")}</legend>
               {(['all', 'scheduled', 'walk-in', 'urgent'] as const).map((mode) => (
                 <label key={mode}>
                   <input type="radio" name="visit-mode" checked={filters.visitMode === mode} onChange={() => updateFilter('visitMode', mode)} />
-                  <span>{mode === 'all' ? t("Any visit type") : mode === 'walk-in' ? t("Walk-in") : t(mode[0].toUpperCase() + mode.slice(1))}</span>
+                  <span>{mode === 'all' ? t("Any visit type") : mode === 'walk-in' ? t("Walk-in") : t(mode === 'urgent' ? 'Urgent Care' : 'Scheduled')}</span>
                 </label>
               ))}
             </fieldset>
