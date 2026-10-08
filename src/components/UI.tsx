@@ -14,12 +14,12 @@ export function DemoBadge({ label = 'Prototype data' }: { label?: string }) {
   );
 }
 
-export function ReliabilityBadge({ level }: { score: number; level: ConfidenceLevel }) {
+export function ReliabilityBadge({ score, level }: { score: number; level: ConfidenceLevel }) {
   const { t } = useApp();
   return (
-    <span data-tour="reliability" className={`reliability-badge reliability-${level}`} aria-label={t('Estimate confidence: {level}', {level:t(level)})}>
+    <span data-tour="reliability" className={`reliability-badge reliability-${level}`} aria-label={t('{score} percent reliability, {level} confidence', {score, level: t(level)})}>
       <ShieldCheck aria-hidden="true" size={15} />
-      {t('Estimate confidence: {level}',{level:t(level)})}
+      {score}% · {t(level)}
     </span>
   );
 }

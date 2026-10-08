@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { Modal } from './UI';
 import { navigate } from '../utils/navigation';
 
 const steps = [
@@ -10,15 +9,13 @@ const steps = [
   ['estimates', 'The entire visit', 'See the estimated time for the entire visit, not just the waiting room.'],
   ['reliability', 'Estimate confidence', 'See how much confidence MediQ has in each estimate.'],
   ['appointments', 'Appointments', 'Plan saved visits and see when to leave.'],
-  ['report', 'Report a Wait', 'Share your visit experience to improve MediQ’s timing information.'],
+  ['report', 'Report wait', 'Share your visit experience to improve MediQ’s timing information.'],
 ];
 export function ProductTour({ currentPath }: { currentPath: string }) {
-  const { t, tourDone, tourPending, claimTour, finishTour, user } = useApp();
+  const { t, tourDone, finishTour } = useApp();
   const [step, setStep] = useState<number | null>(() => {
-    return currentPath === '/find' && !user && !tourDone ? 0 : null;
+    return currentPath === '/find' && !tourDone ? 0 : null;
   });
-  const tourClaim=useRef<{owner:string;request:Promise<boolean>}|null>(null);
-  useEffect(()=>{let active=true;if(currentPath==='/find'&&user&&tourPending){if(tourClaim.current?.owner!==user.id)tourClaim.current={owner:user.id,request:claimTour()};void tourClaim.current.request.then(start=>{if(active&&start)setStep(0);}).catch(()=>{});}return()=>{active=false;};},[currentPath,user?.id,tourPending,claimTour]);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const finish = () => { setStep(null); finishTour(); };
   useEffect(() => {
@@ -39,7 +36,7 @@ export function ProductTour({ currentPath }: { currentPath: string }) {
       if (button?.offsetWidth && button.getAttribute('aria-expanded') === 'false') button.click();
     }
     locate();
-    target?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     const timer = window.setInterval(locate, 350);
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') finish(); };
     window.addEventListener('keydown', escape);
@@ -50,10 +47,10 @@ export function ProductTour({ currentPath }: { currentPath: string }) {
   if (step === null) return null;
   return <>
     {rect && <div className="tour-highlight" aria-hidden="true" style={{ top: rect.top - 5, left: rect.left - 5, width: rect.width + 10, height: rect.height + 10 }} />}
-    <Modal title={t('Product tour')} onClose={finish}><div className="tour-content">
-
+    <aside className="product-tour" aria-label={t('Product tour')}>
+      <button type="button" className="modal-close" aria-label={t('Skip tour')} onClick={finish}><X aria-hidden="true" /></button>
       <div aria-live="polite" aria-atomic="true"><span className="eyebrow">{t('Quick introduction')} · {step + 1} / {steps.length}</span><h2>{t(steps[step][1])}</h2><p>{t(steps[step][2])}</p></div>
       <div className="tour-actions"><button className="text-button" onClick={finish}>{t('Skip tour')}</button><div>{step > 0 && <button className="button button-secondary" onClick={() => setStep(step - 1)}>{t('Back')}</button>}<button className="button button-primary" onClick={() => step === steps.length - 1 ? finish() : setStep(step + 1)}>{t(step === steps.length - 1 ? 'Done' : 'Next')}</button></div></div>
-    </div></Modal>
+    </aside>
   </>;
 }

@@ -9,12 +9,11 @@ import { clinicCorrectionSchema, planSchema, preferenceSchema, profileSchema, si
 import { recalculate } from './jobs.ts';
 import { adapters, unavailable } from './integrations.ts';
 import { searchDirectory } from '../src/services/search.ts';
-import { accessibilityKeys } from '../src/types.ts';
 import type { Clinic, PatientReport, SearchFilters, ReliabilityScore } from '../src/types.ts';
 import type { EstimateResult } from './estimator.ts';
 import type { ServerConfig } from './config.ts';
 
-const filtersSchema=z.object({accessibility:z.array(z.enum(accessibilityKeys)).max(7).default([]),location:z.string().max(200).default(''),query:z.string().max(300).default(''),insurance:z.string().max(100).default(''),specialty:z.string().max(100).default(''),language:z.string().max(100).default(''),minimumRating:z.number().min(0).max(5).default(0),visitMode:z.enum(['all','scheduled','walk-in','urgent']).default('all'),timing:z.enum(['all','open-now','morning','afternoon']).default('all'),maxDistance:z.number().min(0).max(1000).default(10),origin:z.object({latitude:z.number().min(-90).max(90),longitude:z.number().min(-180).max(180)}).optional()}).strict();
+const filtersSchema=z.object({query:z.string().max(300).default(''),insurance:z.string().max(100).default(''),specialty:z.string().max(100).default(''),language:z.string().max(100).default(''),minimumRating:z.number().min(0).max(5).default(0),visitMode:z.enum(['all','scheduled','walk-in','urgent']).default('all'),timing:z.enum(['all','open-now','morning','afternoon']).default('all'),maxDistance:z.number().min(0).max(1000).default(10),origin:z.object({latitude:z.number().min(-90).max(90),longitude:z.number().min(-180).max(180)}).optional()}).strict();
 const authPaths=new Set(['/sign-up/email','/sign-in/email','/sign-out','/get-session','/email-otp/send-verification-otp','/email-otp/verify-email','/email-otp/request-password-reset','/email-otp/reset-password','/change-password']);
 export function createApplication(config:ServerConfig) {
  const db=openDatabase(config); const auth=makeAuth(db,config); if(config.adminEnabled)seedTasks(db);
@@ -22,22 +21,19 @@ export function createApplication(config:ServerConfig) {
  const baseClinic=(id:string):Clinic|undefined=>{const r=db.prepare('SELECT document FROM clinics WHERE id=?').get(id);return r?JSON.parse(r.document as string):undefined;};
  const clinicView=(id:string)=>{
   const clinic=baseClinic(id); if(!clinic)return;
-  clinic.fictional=!!db.prepare('SELECT fictional FROM source_metadata WHERE clinic_id=?').get(id)?.fictional;
-  clinic.accessibility=Object.fromEntries(db.prepare('SELECT attribute,availability FROM clinic_accessibility WHERE clinic_id=?').all(id).map(row=>[row.attribute,row.availability])) as Clinic['accessibility'];
   const reports=db.prepare("SELECT public_document FROM reports WHERE clinic_id=? AND status='accepted' ORDER BY submitted_at DESC LIMIT 20").all(id).map(r=>JSON.parse(r.public_document as string));
   const evidence=Object.fromEntries(db.prepare('SELECT mode,document FROM estimates WHERE clinic_id=?').all(id).map(r=>[r.mode,JSON.parse(r.document as string)])) as Record<string,EstimateResult>;
   clinic.recentReports=reports; // Fixture reports are not stored user submissions or metrics.
   clinic.estimates=clinic.estimates.map(e=>{
    const result=evidence[e.mode];
-   const provenance={calculatedAt:result?.calculatedAt||null,evidenceUpdatedAt:result?.evidenceUpdatedAt||null,fictional:result?.state!=='ready'&&!!clinic.fictional,sources:result?.state==='ready'?(result.sources||[{kind:'patient-reports' as const,count:result.eligibleSamples}]):(clinic.fictional?[{kind:'fictional-model' as const}]:[])};
    const level=result?.state==='ready'?result.confidence:'low';
    const reliability:ReliabilityScore={score:result?.state==='ready'?({low:35,medium:65,high:85}[level]):0,level,
-    summary:result?.state==='ready'?'Confidence reflects recent completed reports, sample size and spread.':clinic.fictional?'Not enough fresh reports. The displayed reference is fictional, not a live estimate.':'Not enough recent evidence for a current estimate.',
+    summary:result?.state==='ready'?'Confidence reflects recent completed reports, sample size and spread.':'Not enough fresh reports. The displayed reference is fictional, not a live estimate.',
     factors:[{label:'Completed sample size',score:Math.min(100,(result?.eligibleSamples||0)*5),explanation:'Only accepted completed visits contribute to the total.'},{label:'Fresh evidence',score:result?.state==='ready'?100:0,explanation:'At least one completed report must be less than 24 hours old.'}]};
-   if(!result||result.state!=='ready')return {...e,provenance,reliability,evidenceState:result?.state||'insufficient',contributingReports:result?.eligibleSamples||0};
+   if(!result||result.state!=='ready')return {...e,reliability,evidenceState:result?.state||'insufficient',contributingReports:result?.eligibleSamples||0};
    const total=result.totalMinutes!;let assigned=0;
    const stages=e.stages.map((s,i)=>{const minutes=i===e.stages.length-1?total-assigned:Math.floor(total*s.minutes/e.totalMinutes);assigned+=minutes;return {...s,minutes};});
-   return {...e,provenance,reliability,totalMinutes:total,range:result.range!,stages,evidenceState:'ready',contributingReports:result.eligibleSamples,updatedMinutesAgo:Math.floor((Date.now()-Date.parse(result.calculatedAt))/60000)};
+   return {...e,reliability,totalMinutes:total,range:result.range!,stages,evidenceState:'ready',contributingReports:result.eligibleSamples,updatedMinutesAgo:Math.floor((Date.now()-Date.parse(result.calculatedAt))/60000)};
   });
   return {...clinic,reliability:clinic.estimates[0]?.reliability||clinic.reliability,currentEvidence:evidence};
  };
@@ -86,23 +82,15 @@ export function createApplication(config:ServerConfig) {
    if(path==='/api/me'&&method==='GET') {
     if(!user)return json({user:null,admin:false});
     db.prepare('INSERT OR IGNORE INTO profiles(user_id) VALUES (?)').run(user.id);
-    const profile=db.prepare('SELECT sex,weight_kg AS weightKg,height_cm AS heightCm,age,language,notifications FROM profiles WHERE user_id=?').get(user.id)!;
-    return json({user:{id:user.id,email:user.email,firstName:user.firstName,lastName:user.lastName,createdAt:user.createdAt},admin,tourState:db.prepare('SELECT tour_state FROM account_metadata WHERE user_id=?').get(user.id)?.tour_state||'complete',profile:{...profile,notifications:!!profile.notifications},savedClinicIds:db.prepare('SELECT clinic_id FROM saved_clinics WHERE user_id=?').all(user.id).map(r=>r.clinic_id),savedAppointments:db.prepare('SELECT document FROM visit_plans WHERE user_id=? ORDER BY created_at DESC').all(user.id).map(r=>JSON.parse(r.document as string))});
+    const profile=db.prepare('SELECT sex,gender,weight_kg AS weightKg,height_cm AS heightCm,age,language,notifications FROM profiles WHERE user_id=?').get(user.id)!;
+    return json({user:{id:user.id,email:user.email,firstName:user.firstName,lastName:user.lastName,createdAt:user.createdAt},admin,profile:{...profile,notifications:!!profile.notifications},savedClinicIds:db.prepare('SELECT clinic_id FROM saved_clinics WHERE user_id=?').all(user.id).map(r=>r.clinic_id),savedAppointments:db.prepare('SELECT document FROM visit_plans WHERE user_id=? ORDER BY created_at DESC').all(user.id).map(r=>JSON.parse(r.document as string))});
    }
    if(path==='/api/profile'&&method==='PUT') {
     const owner=requireUser();const data=profileSchema.parse(await request.json());
-    transaction(db,()=>{db.prepare('UPDATE user SET firstName=?,lastName=?,name=?,updatedAt=? WHERE id=?').run(data.firstName,data.lastName,`${data.firstName} ${data.lastName}`,Date.now(),owner.id);db.prepare('INSERT INTO profiles(user_id,sex,weight_kg,height_cm,age,language,notifications) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET sex=excluded.sex,weight_kg=excluded.weight_kg,height_cm=excluded.height_cm,age=excluded.age,language=excluded.language,notifications=excluded.notifications').run(owner.id,data.sex,data.weightKg,data.heightCm,data.age,data.language,Number(data.notifications));});
+    transaction(db,()=>{db.prepare('UPDATE user SET firstName=?,lastName=?,name=?,updatedAt=? WHERE id=?').run(data.firstName,data.lastName,`${data.firstName} ${data.lastName}`,Date.now(),owner.id);db.prepare('INSERT INTO profiles VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET sex=excluded.sex,gender=excluded.gender,weight_kg=excluded.weight_kg,height_cm=excluded.height_cm,age=excluded.age,language=excluded.language,notifications=excluded.notifications').run(owner.id,data.sex,data.gender||null,data.weightKg,data.heightCm,data.age,data.language,Number(data.notifications));});
     return json({ok:true});
    }
    if(path==='/api/preferences'&&method==='PUT'){const owner=requireUser();const data=preferenceSchema.parse(await request.json());db.prepare('INSERT INTO profiles(user_id,language) VALUES (?,?) ON CONFLICT(user_id) DO UPDATE SET language=excluded.language').run(owner.id,data.language);return json({ok:true});}
-   if(path==='/api/tour/start'&&method==='POST'){const owner=requireUser();const result=db.prepare("UPDATE account_metadata SET tour_state='started' WHERE user_id=? AND tour_state='pending'").run(owner.id);return json({start:!!result.changes});}
-   if(path==='/api/tour/complete'&&method==='POST'){const owner=requireUser();db.prepare("UPDATE account_metadata SET tour_state='complete' WHERE user_id=?").run(owner.id);return json({ok:true});}
-   if(path==='/api/accessibility-feedback'&&method==='POST'){
-    limit(db,`accessibility-feedback:${actor}`,3,3600000);
-    const data=z.object({message:z.string().trim().min(5).max(1000)}).strict().parse(await request.json());
-    db.prepare('INSERT INTO accessibility_feedback VALUES (?,?,?)').run(randomUUID(),data.message,Date.now());
-    return json({ok:true},201);
-   }
    if(path==='/api/account'&&method==='DELETE'){
     const owner=requireUser();const body=z.object({password:z.string().min(1).max(128),confirmation:z.literal('DELETE')}).strict().parse(await request.json());
     limit(db,`delete:${owner.id}`,5,15*60000);
@@ -157,7 +145,6 @@ export function createApplication(config:ServerConfig) {
    if(path.startsWith('/api/admin/')){
     requireUser();if(!admin)throw new HttpError(403,'ADMIN_REQUIRED');
     const audit=(action:string,target:string,changes:unknown)=>db.prepare('INSERT INTO audit_log VALUES (?,?,?,?,?,?)').run(randomUUID(),user!.id,action,target,JSON.stringify(changes),Date.now());
-    if(path==='/api/admin/accessibility-feedback'&&method==='GET')return json(db.prepare('SELECT id,message,created_at FROM accessibility_feedback ORDER BY created_at DESC LIMIT 100').all());
     if(path==='/api/admin/guide'&&method==='GET')return new Response(readFileSync(new URL('../docs/runbook.md',import.meta.url),'utf8'),{headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store'}});
     if(path==='/api/admin/accounts'&&method==='GET'){
      const query=(url.searchParams.get('q')||'').slice(0,100);const page=Math.max(0,Math.min(100000,Number(url.searchParams.get('page'))||0));const pattern=`%${query.replace(/[\\%_]/g,'\\$&')}%`;

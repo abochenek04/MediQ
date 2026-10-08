@@ -28,10 +28,6 @@ import {
   RatingStars,
   VisitBreakdown,
 } from '../components/ClinicComponents';
-import { accessibilityKeys } from '../types';
-import { accessibilityLabels } from '../utils/accessibility';
-import { EstimateEvidence, InsuranceNotice, EmergencyNotice, ConceptHelp, hasEstimate } from '../components/CareInformation';
-import { TimePicker } from '../components/TimePicker';
 import { DemoBadge, InfoNote, Modal, PageLoader, ReliabilityBadge, SafetyNote } from '../components/UI';
 import { useApp } from '../context/AppContext';
 import { backendEnabled } from '../services/api';
@@ -42,7 +38,7 @@ import { relativeReportTime, toLocalDateTimeInput } from '../utils/time';
 
 export function ClinicPage({ clinicId }: { clinicId: string }) {
   const {
-    t, language,
+    t,
     savedClinicIds,
     submittedReports,
     toggleSavedClinic,
@@ -182,7 +178,7 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
         </div>
       </div>
 
-      <div className="shell profile-content"><EmergencyNotice/>
+      <div className="shell profile-content">
         <section className="live-estimate-section" aria-labelledby="live-estimate-title">
           <div className="section-heading split-heading">
             <div>
@@ -203,19 +199,19 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
 
           <div className="live-estimate-card">
             <div className="live-number-panel">
-              <span>{t(estimate.provenance?.fictional?'Fictional reference estimate':'Estimated total visit time')}</span><ConceptHelp label="About visit estimates" text="The estimated total time from arrival to departure, including check-in, waiting, care and check-out."/>
-              <strong className={!hasEstimate(estimate)?"estimate-unavailable":undefined}>{hasEstimate(estimate)?new Intl.NumberFormat(language).format(estimate.totalMinutes):t('Unavailable')}{hasEstimate(estimate)&&<small> {t("min")}</small>}</strong>
-              {hasEstimate(estimate)&&<p>{t('Usually {low}–{high} min',{low:estimate.range[0],high:estimate.range[1]})}</p>}
-              <EstimateEvidence estimate={estimate}/>
+              <span>{t("Demo total visit estimate")}</span>
+              <strong>{estimate.totalMinutes}<small> {t("min")}</small></strong>
+              <p>{t("Likely range:")} {estimate.range[0]}–{estimate.range[1]} {t("minutes")}</p>
+              <div className="live-update"><Clock3 aria-hidden="true" /> {t("Updated")} {estimate.updatedMinutesAgo} {t("minutes ago")}</div>
             </div>
             <div className="live-breakdown-panel">
               <div className="estimate-card-topline">
                 <span className="mode-pill">{t(formatMode(estimate.mode))}</span>
                 <ReliabilityBadge score={reliability.score} level={reliability.level} />
               </div>
-              {hasEstimate(estimate)&&<VisitBreakdown estimate={estimate}/>}
-              {backendEnabled && <p className="info-note">{t(estimate.evidenceState === 'ready' ? 'Report-based total. Stage proportions are modeled, not measured.' : estimate.provenance?.fictional ? 'Not enough fresh reports. The displayed reference is fictional, not a live estimate.' : 'Not enough recent evidence for a current estimate.')}</p>}
-              <ConceptHelp label="About confidence" text="Confidence describes the freshness, amount and consistency of timing evidence. It does not rate care quality."/>
+              <VisitBreakdown estimate={estimate} />
+              {backendEnabled && <p className="info-note">{t(estimate.evidenceState === 'ready' ? 'Report-based total. Stage proportions are modeled, not measured.' : 'Not enough fresh reports. The displayed reference is fictional, not a live estimate.')}</p>}
+              <p className="estimate-source-line"><Users aria-hidden="true" /> {estimate.contributingReports} {t("recent sample reports contribute to this view.")}</p>
             </div>
             <div className="live-action-panel">
               <CalendarPlus aria-hidden="true" />
@@ -238,14 +234,14 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
               </div>
               <span className="sample-chip">{t("Modeled history")}</span>
             </div>
-            <ConceptHelp label="About historical patterns" text="Patterns show how visit times varied in the past. Fictional modeled history is labeled and does not predict your visit."/><HistoricalChart records={clinic.historicalWaits} takeaway={clinic.takeaway} />
+            <HistoricalChart records={clinic.historicalWaits} takeaway={clinic.takeaway} />
           </section>
 
           <aside className="profile-card reliability-section" id="reliability" aria-labelledby="reliability-title">
             <span className="eyebrow">{t("Not a star rating")}</span>
             <h2 id="reliability-title">{t("Estimate confidence")}</h2>
             <div className={`confidence-score score-${reliability.level}`}>
-
+              <div><strong>{reliability.score}</strong><span>/100</span></div>
               <b>{t(reliability.level)} {t("confidence")}</b>
             </div>
             <p>{t(reliability.summary)}</p>
@@ -254,7 +250,7 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
                 <div className="factor" key={t(factor.label)} title={t(factor.explanation)}>
                   <div><span>{t(factor.label)}</span><strong>{factor.score}</strong></div>
                   <div className="factor-track"><span style={{ width: `${factor.score}%` }} /></div>
-                  <small>{t(factor.explanation)}</small>
+                  <small>{factor.explanation}</small>
                 </div>
               ))}
             </div>
@@ -321,7 +317,7 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
               <h2 id="reviews-title">{t("More than one rating")}</h2>
               <p>{t("Clinic experience and provider experience answer different questions.")}</p>
             </div>
-            {clinic.rating&&<div className="overall-rating"><Star aria-hidden="true" fill="currentColor" /><strong>{averageRating.toFixed(1)}</strong><span>{t(clinic.rating?.source==='demo'?'Sample clinic experience':'Patient experience')}</span></div>}
+            <div className="overall-rating"><Star aria-hidden="true" fill="currentColor" /><strong>{averageRating.toFixed(1)}</strong><span>{t("Sample clinic experience")}</span></div>
           </div>
           <div className="review-grid">
             {clinic.reviews.map((review) => (
@@ -367,7 +363,7 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
           <section className="profile-card">
             <h2>{t("Accepted insurance")} <small>{t("sample list")}</small></h2>
             <div className="tag-list">{clinic.insurance.map((item) => <span key={item}><Check aria-hidden="true" /> {item}</span>)}</div>
-            <InsuranceNotice/>
+            <p>{t("Coverage and network status can change. Confirm directly before booking.")}</p>
           </section>
           <section className="profile-card">
             <h2>{t("Care offered")}</h2>
@@ -376,7 +372,6 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
           </section>
         </div>
 
-        <section className="profile-card clinic-accessibility"><h2>{t('Clinic accessibility')}</h2><p>{t(clinic.fictional?'Fictional accessibility attributes. Confirm services directly with the clinic.':'Please confirm accessibility services directly with the clinic.')}</p><dl>{accessibilityKeys.map(key=><div key={key}><dt>{t(accessibilityLabels[key])}</dt><dd>{t(clinic.accessibility?.[key]==='available'?'Available':clinic.accessibility?.[key]==='unavailable'?'Not available':'Unknown')}</dd></div>)}</dl></section>
         <SafetyNote />
       </div>
 
@@ -386,9 +381,13 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
             <form onSubmit={handleSavePlan}>
               <label className="field-label">
                 <span>{t("Appointment or planned arrival")}</span>
-                <input required type="date" value={planValues.appointmentTime.slice(0,10)} onChange={event=>setPlanValues(current=>({...current,appointmentTime:event.target.value+'T'+current.appointmentTime.slice(11)}))}/>
+                <input
+                  required
+                  type="datetime-local"
+                  value={planValues.appointmentTime}
+                  onChange={(event) => setPlanValues((current) => ({ ...current, appointmentTime: event.target.value }))}
+                />
               </label>
-              <TimePicker label="Planned arrival time" value={planValues.appointmentTime.slice(11,16)} onChange={value=>setPlanValues(current=>({...current,appointmentTime:current.appointmentTime.slice(0,10)+'T'+(value||'00:00')}))}/>
               <div className="modal-fields-row">
                 <label className="field-label">
                   <span>{t("Simulated travel time")}</span>
@@ -405,7 +404,7 @@ export function ClinicPage({ clinicId }: { clinicId: string }) {
               </div>
               <div className="plan-form-summary">
                 <Timer aria-hidden="true" />
-                <span><strong>{hasEstimate(estimate)?t('{minutes} min',{minutes:estimate.totalMinutes}):t('Unavailable')}</strong><EstimateEvidence estimate={estimate}/></span>
+                <span><strong>{estimate.totalMinutes} {t("min estimated visit")}</strong><small>{t("Likely range")} {estimate.range[0]}–{estimate.range[1]} {t("minutes")}</small></span>
               </div>
               <button className="button button-primary button-full" type="submit" disabled={savingPlan}>
                 {savingPlan ? t("Saving your plan…") : t("Save visit & calculate plan")} <ArrowRight aria-hidden="true" />

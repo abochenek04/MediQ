@@ -140,10 +140,6 @@ try {
     assert.equal(exact.timing.checkInTime, '09:10');
     assert.equal(exact.anonymous, true);
     assert.equal(exact.communication, 4);
-    const midnightDraft={...initialDraft(clinics[0].id),visitDate:new Date(Date.now()-2*86400000).toISOString().slice(0,10),arrivalTime:'23:30',departureTime:'00:30',crossesMidnight:true};
-    assert.equal((await clinicService.submitWaitReport(midnightDraft)).totalMinutes,60);
-    assert.equal((await clinicService.submitWaitReport({...midnightDraft,departureTime:'23:30'})).totalMinutes,1440);
-    await assert.rejects(clinicService.submitWaitReport({...midnightDraft,crossesMidnight:false}));
     const ranged = await clinicService.submitWaitReport({ ...draft, arrivalTime: '', providerTime: '', departureTime: '', totalRange: '30–60 minutes', anonymous: false });
     assert.equal(ranged.totalMinutes, 45);
     assert.equal(ranged.anonymous, false);

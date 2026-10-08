@@ -1,13 +1,122 @@
-import { useState, type FormEvent } from 'react';
+import {
+  ArrowRight,
+  BadgeCheck,
+  Bookmark,
+  Check,
+  Clock3,
+  LockKeyhole,
+  MapPin,
+  Sparkles,
+  UserRound,
+} from 'lucide-react';
+import { useState } from 'react';
+import { LanguageSelector } from '../components/Layout';
+import { Brand } from '../components/Brand';
+import { DemoBadge, SafetyNote } from '../components/UI';
 import { useApp } from '../context/AppContext';
-import { specialtyOptions } from '../data/mockData';
 import { Link, navigate } from '../utils/navigation';
-import { EmergencyNotice } from '../components/CareInformation';
-export function OnboardingPage(){
- const {t}=useApp();const [location,setLocation]=useState('');const [specialty,setSpecialty]=useState('');
- const find=(event:FormEvent)=>{event.preventDefault();const query=new URLSearchParams();if(location.trim())query.set('location',location.trim());if(specialty)query.set('specialty',specialty);navigate(`/find${query.size?'?'+query:''}`);};
- return <div className="homepage"><section className="home-search-section shell"><h1>{t('Find care that fits your schedule')}</h1>
-  <form className="home-search" role="search" onSubmit={find}><label className="field-label"><span>{t('Location')}</span><input value={location} onChange={event=>setLocation(event.target.value)} placeholder={t('Durham neighborhood or ZIP')}/></label><label className="field-label"><span>{t('What kind of care are you looking for?')}</span><select aria-label={t('What kind of care are you looking for?')} value={specialty} onChange={event=>setSpecialty(event.target.value)}><option value="">{t('All care categories')}</option>{specialtyOptions.map(value=><option key={value} value={value}>{t(value==='Urgent care'?'Urgent Care':value)}</option>)}</select></label><button className="button button-primary" type="submit">{t('Find Care')}</button></form>
-  <EmergencyNotice/><p>{t('Fictional Durham directory. No medical history is needed to browse.')}</p>
- </section><section className="shell home-options"><h2>{t('Plan your care, your way')}</h2><div className="home-option-grid"><article><h3>{t('Continue as a guest')}</h3><p>{t('Browse and plan as a guest. Guest changes reset when you reload or close the tab.')}</p><Link className="button button-secondary" to="/find">{t('Explore as a guest')}</Link></article><article><h3>{t('Create a free account')}</h3><p>{t('Verified accounts sync saved clinics, visit plans and preferences across devices.')}</p><Link className="button button-secondary" to="/signup">{t('Sign up')}</Link></article><article><h3>{t('Explore future Plus')}</h3><p>{t('See the questions MediQ must answer before any optional planning tier is defined.')}</p><Link className="text-link" to="/know#access">{t('View the concept')}</Link></article></div></section></div>;
+
+export function OnboardingPage() {
+  const { t, pushToast } = useApp();
+  const enterAsGuest = () => navigate('/find');
+
+  return (
+    <main id="main-content" className="onboarding-page">
+      <section className="onboarding-intro">
+        <div className="onboarding-brand-row">
+          <Brand />
+          <LanguageSelector />
+          <DemoBadge />
+        </div>
+
+        <div className="onboarding-copy">
+          <span className="eyebrow light">{t("Healthcare planning, made human")}</span>
+          <h1>{t('heroTitle')}</h1>
+          <p> {t("See how long a visit may take, how reliable that estimate is, and when to leave—before your day gets away from you.")} </p>
+        </div>
+
+        <div className="preview-card" aria-label={t('Example MediQ visit estimate')}>
+          <div className="preview-card-header">
+            <span><MapPin aria-hidden="true" /> Durham, NC</span>
+            <span className="status status-open"><span /> {t("Open now")}</span>
+          </div>
+          <div className="preview-time-row">
+            <div>
+              <small>{t("Estimated total visit")}</small>
+              <strong>54 <span>{t("min")}</span></strong>
+            </div>
+            <div className="preview-confidence">
+              <BadgeCheck aria-hidden="true" />
+              <span><b>91%</b> {t("confidence")}</span>
+            </div>
+          </div>
+          <div className="preview-timeline" aria-hidden="true">
+            <span style={{ flex: 7 }} />
+            <span style={{ flex: 24 }} />
+            <span style={{ flex: 17 }} />
+            <span style={{ flex: 6 }} />
+          </div>
+          <div className="preview-labels">
+            <span>{t("Check in")}</span><span>{t("Wait")}</span><span>{t("Care")}</span><span>{t("Check out")}</span>
+          </div>
+        </div>
+
+        <p className="onboarding-data-note"><LockKeyhole aria-hidden="true" /> {t("No medical history is needed to browse.")}</p>
+      </section>
+
+      <section className="onboarding-options" aria-labelledby="start-title">
+        <div className="onboarding-options-inner">
+          <span className="eyebrow">{t("Welcome to MediQ")}</span>
+          <h2 id="start-title">{t("How would you like to start?")}</h2>
+          <p className="section-intro">{t("You can explore the full care-finding experience without an account.")}</p>
+
+          <div className="entry-options">
+            <article className="entry-card recommended">
+              <span className="recommended-tag">{t("Fastest · recommended")}</span>
+              <div className="entry-icon"><Clock3 aria-hidden="true" /></div>
+              <div>
+                <h3>{t("Continue as a guest")}</h3>
+                <p>{t("Browse and plan as a guest. Guest changes reset when you reload or close the tab.")}</p>
+                <ul>
+                  <li><Check aria-hidden="true" /> {t("No sign-up")}</li>
+                  <li><Check aria-hidden="true" /> {t("No health information")}</li>
+                  <li><Check aria-hidden="true" /> {t("Full prototype access")}</li>
+                </ul>
+              </div>
+              <button className="button button-primary button-large" type="button" onClick={enterAsGuest}> {t("Explore as a guest")} <ArrowRight aria-hidden="true" />
+              </button>
+            </article>
+
+            <article className="entry-card">
+              <div className="entry-icon soft"><UserRound aria-hidden="true" /></div>
+              <div>
+                <h3>{t("Create a free account")}</h3>
+                <p>{t("Verified accounts sync saved clinics, visit plans and preferences across devices.")}</p>
+              </div>
+              <Link className="button button-secondary button-large" to="/signup">{t('Sign up')}</Link>
+            </article>
+
+            <article className="entry-card plus-card">
+              <div className="entry-icon gold"><Sparkles aria-hidden="true" /></div>
+              <div>
+                <div className="entry-title-row">
+                  <h3>{t("Explore future Plus")}</h3>
+                  <span>{t("Concept")}</span>
+                </div>
+                <p>{t("See the questions MediQ must answer before any optional planning tier is defined.")}</p>
+              </div>
+              <Link className="button button-ghost button-large" to="/know#access"> {t("View the concept")} <ArrowRight aria-hidden="true" />
+              </Link>
+            </article>
+          </div>
+
+          <div className="guest-capabilities">
+            <Bookmark aria-hidden="true" />
+            <p><strong>{t("Guest-first by design.")}</strong> {t("Guest changes are temporary. Account data is private and persistent. No medical history is needed to browse.")}</p>
+          </div>
+          <SafetyNote compact />
+        </div>
+      </section>
+    </main>
+  );
 }

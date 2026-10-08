@@ -1,6 +1,4 @@
 import { useEffect, lazy, Suspense } from 'react';
-import { AccessibilityPage } from './pages/AccessibilityPage';
-import { PolicyPage } from './pages/PolicyPage';
 import { AccountPage } from './pages/AccountPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { PageLoader } from './components/UI';
@@ -19,7 +17,7 @@ const AdminPage = (import.meta.env.VITE_APP_ENV === 'staging' || import.meta.env
 
 const pageTitle = (path: string) => {
   if (path.startsWith('/clinic/')) return 'Clinic details';
-  return ({'/':'heroTitle','/find':'Find care','/saved':'Appointments','/report':'Report a Wait','/appointments':'Appointments','/about':'About','/privacy':'Privacy','/safety':'Safety','/accessibility':'Accessibility','/know':'About','/contact':'Contact Us','/login':'Sign in','/signup':'Create a free account','/verify':'Verify your email','/reset-password':'Reset password','/settings':'Settings','/admin':'Administration'} as Record<string,string>)[path] || 'Page not found';
+  return ({'/':'heroTitle','/find':'Find care','/saved':'Appointments','/report':'Report your visit','/know':'About','/contact':'Contact Us','/login':'Sign in','/signup':'Create a free account','/verify':'Verify your email','/reset-password':'Reset password','/settings':'Settings','/admin':'Administration'} as Record<string,string>)[path] || 'Page not found';
 };
 
 function AppRoutes() {
@@ -33,24 +31,20 @@ function AppRoutes() {
 
   if (!accountReady) return <div className="shell page-space">{accountError ? <div role="alert"><p>{t(accountError)}</p><button className="button button-primary" onClick={() => void refreshAccount()}>{t('Try again')}</button></div> : <PageLoader label="Restoring your session" />}</div>;
 
-
+  if (location.pathname === '/') return <OnboardingPage />;
 
   let page: React.ReactNode;
-  if (location.pathname === '/') page = <OnboardingPage />;
-  else if (location.pathname === '/accessibility') page = <AccessibilityPage />;
-  else if (location.pathname === '/privacy') page = <PolicyPage kind="privacy" />;
-  else if (location.pathname === '/safety') page = <PolicyPage kind="safety" />;
-  else if (location.pathname === '/login') page = <AccountPage key="login" mode="login" />;
+  if (location.pathname === '/login') page = <AccountPage key="login" mode="login" />;
   else if (location.pathname === '/signup') page = <AccountPage key="signup" mode="signup" />;
   else if (location.pathname === '/verify') page = <AccountPage key="verify" mode="verify" />;
   else if (location.pathname === '/reset-password') page = <AccountPage key="reset" mode="reset" />;
   else if (location.pathname === '/settings') page = <SettingsPage key={user?.id || 'guest'} />;
   else if (location.pathname === '/admin' && AdminPage) page = <Suspense fallback={<PageLoader />}><AdminPage /></Suspense>;
   else if (location.pathname === '/find') page = <FindCarePage />;
-  else if ((location.pathname === '/saved' || location.pathname === '/appointments')) page = <SavedPage />;
+  else if (location.pathname === '/saved') page = <SavedPage />;
   else if (location.pathname === '/report') page = <ReportPage />;
   else if (location.pathname === '/contact') page = <ContactPage />;
-  else if ((location.pathname === '/know' || location.pathname === '/about')) page = <KnowPage />;
+  else if (location.pathname === '/know') page = <KnowPage />;
   else if (location.pathname.startsWith('/clinic/')) {
     page = <ClinicPage clinicId={decodeURIComponent(location.pathname.split('/')[2] || '')} />;
   } else {

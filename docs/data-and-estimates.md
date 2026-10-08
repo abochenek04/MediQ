@@ -2,7 +2,7 @@
 
 ## Ownership and deletion
 
-The browser has no database credentials. Every private API call derives the owner from a verified, unexpired Better Auth session. ID changes cannot retrieve another user's plan; payloads with unknown ownership fields are rejected. A plan ID is unique **within** an owner, so another user cannot overwrite the original. Profiles, preferences, saved clinics, plans, identities and sessions have deletion cascades. Migration 002 drops the stored gender column. Optional sex, canonical kg/cm and age are private and omitted from routine administrator directories and analytics. No account email editing is exposed; password changes and resets use the provider and revoke other sessions.
+The browser has no database credentials. Every private API call derives the owner from a verified, unexpired Better Auth session. ID changes cannot retrieve another user's plan; payloads with unknown ownership fields are rejected. A plan ID is unique **within** an owner, so another user cannot overwrite the original. Profiles, preferences, saved clinics, plans, identities and sessions have deletion cascades. Optional profile fields are private and omitted from routine administrator directories and analytics. No account email editing is exposed; password changes and resets use the provider and revoke other sessions.
 
 Account deletion requires a current password plus explicit `DELETE` confirmation. Password checking uses Better Auth, then a single SQLite transaction deletes the identity and its cascaded data/reports and recomputes estimates. Failure rolls back, so the account remains recoverable rather than half-deleted. Aggregate daily counts have no owner linkage and remain. Old signed cookies cannot restore a deleted identity. Backup removal depends on actual operator/provider retention; do not promise immediate deletion from backups. See the runbook's restore/deletion reconciliation procedure.
 
@@ -12,15 +12,9 @@ Free-text report notes and exact input timestamps are validated but not retained
 
 No search history is stored or sent to an external AI service. Approximate coordinates are rounded by the existing location adapter and used in a request to calculate straight-line distance; the API does not persist them. Manual location/query fallback remains available.
 
-## Imperial settings and tours
-
-Existing metric values already use a single canonical kg/cm form and are retained exactly by migration 002. Dropdown display rounds to the nearest pound/inch but never writes that rounded display back on an unchanged save. A changed selection converts once with 0.45359237 kg/lb or 2.54 cm/in. Empty/clear means SQL NULL. These values remain excluded from reports, analytics and the admin account directory.
-
-Existing accounts receive `tour_state=complete`; new verification creates `pending`. An atomic server claim changes it to `started` once; dismissal/completion persists `complete`. This prevents cross-device auto-replay even if the first introduction is interrupted. Manual replay remains available. Guests retain one tour per temporary memory session and begin with zero saved plans.
-
 ## Reports and estimation
 
-Server rules validate an existing clinic and a supported or explicitly unknown (NULL) visit mode, strict date/time formats, ordered check-in/provider/departure times, 0–1440 elapsed minutes, 1–1440 completed minutes, known total ranges, optional ratings and bounded input lengths. Completed visits must be within 31 days; current waits within two local calendar dates, to allow overnight time zones. Arrival/departure are required only for an exact completed duration; a range is sufficient when times are unknown. Optional check-in/provider times, insurance, language and provider are NULL rather than guessed. Insurance/language/provider inputs are validated then discarded, like notes and raw times. An explicit next-day flag permits one midnight crossing; event order and departure instant are checked with the supplied bounded timezone offset. Unknown modes are retained in the operational feed but excluded from per-mode estimates instead of being guessed into a mode. Reports above eight hours are held for review and excluded from public feeds/estimates pending administrator acceptance.
+Server rules validate an existing clinic and supported visit mode, strict date/time formats, ordered check-in/provider/departure times, 0–1440 elapsed minutes, 1–1440 completed minutes, known total ranges, optional ratings and bounded input lengths. Completed visits must be within 31 days; current waits within two local calendar dates, to allow overnight time zones. A supplied bounded timezone offset allows validating today's future departure times. Reports above eight hours are held for review and excluded from public feeds/estimates pending administrator acceptance.
 
 An idempotency key is required; retrying the same actor/key returns its existing result. A content fingerprint also catches repeats within a day. Each actor is limited to five submission attempts/hour and each network bucket to twenty/hour; malformed requests consume limits too. These are pilot defenses, not proof of a visit or complete fraud prevention. Anonymous cookies can be cleared, and shared networks can reach limits. Actual source/visit verification remains an operational launch decision.
 
@@ -33,8 +27,6 @@ Estimation runs separately for **each clinic and visit mode**, synchronously aft
 5. Confidence is high only for at least 20 eligible samples, at least 10 from the past day and half-range/total <35%; medium requires at least 8 samples and 3 from the past day; otherwise low. Display scores 85/65/35 are **ordinal confidence categories, not calibrated probabilities**. Insufficient/stale evidence displays zero evidence score. No quality-of-care inference is intended.
 6. Ongoing waits from the last two hours are counted separately, exposing their maximum reported elapsed time as a lower-bound observation. They never become completed visits of zero minutes, and are not guessed into total durations.
 
-The typed provenance contract includes `calculatedAt`, nullable `evidenceUpdatedAt`, a fictional flag and the actual contributing source list. Ready totals list only accepted, retained patient reports with their count; ongoing/outlier/review reports cannot inflate it. Clinic-provided data and historical patterns are not named as current-estimate inputs because no such adapter contributes yet. Freshness recalculates in the UI each minute with Intl relative-time formatting. Real stale/sparse estimates show unavailable totals/ranges/stages/finish calculations; fictional seed references remain separately labeled.
-
 Current results and hourly history snapshots are durable. History snapshots retain 90 days. Existing fictional day/time charts remain explicitly modeled reference data until an authorized source provides a suitable real history. Where evidence is insufficient, a seeded clinic's original fictional reference estimate remains visibly labeled as fictional, never presented as fresh live evidence. Stage proportions are a modeled allocation of a ready total, not measured stage durations. The stage sequence stays **Check in → Wait → Care → Check out**.
 
 ## Search algorithm and coverage
@@ -43,15 +35,7 @@ The shared matcher normalizes Unicode, case, Latin accents and punctuation. It p
 
 Curated concepts cover headache/head pain, fever, cough, sore throat, sprain/minor injury, pediatrics and routine checkups, with common English/Spanish/Chinese/Arabic/Polish/Gujarati/Hindi terms. This is a finite vocabulary, not universal semantic understanding or diagnosis. A concept matches only a listed directory capability. The fictional Brightwell and Juniper fixtures explicitly include headache for the demonstration.
 
-All insurance/language/rating/specialty/mode/time/distance/accessibility/location filters are hard constraints. Recommended with a nonempty query uses relevance first; with no query it retains original open/distance ordering or historical morning/afternoon ordering. Explicit nearest, shortest and confidence sorts override relevance intentionally. The page no longer re-sorts recommended search results by distance. Both adapters use the same matcher; the page's request sequence ignores old results after rapid edits. List and map consume the same sorted array.
-
-## Clinic accessibility and insurance
-
-Seven attributes are normalized in `clinic_accessibility`: wheelchair, parking, elevator, restroom, ASL, language services and sensory-friendly options. Each is available/unavailable/unknown. Missing source attributes migrate to unknown. A selected filter requires available for every selected attribute, in combination with all other hard filters. Both service adapters use the same contract/matcher. The admin correction editor validates the full seven-key object and records changes transactionally. Only fictional seeded clinics receive demonstrative invented coverage; reseeding does not overwrite existing corrections.
-
-Accepted insurance describes directory listings. MediQ does not verify benefits or coverage; insurer/clinic confirmation is displayed at filters and profiles.
-
-Accessibility feedback uses its own bounded, rate-limited table and protected internal read endpoint. It is retained for review, without an automatic account link or newly imposed deletion policy. The general contact demo remains explicitly unsent.
+All insurance/language/rating/specialty/mode/time/distance filters are hard constraints. Recommended with a nonempty query uses relevance first; with no query it retains original open/distance ordering or historical morning/afternoon ordering. Explicit nearest, shortest and confidence sorts override relevance intentionally. The page no longer re-sorts recommended search results by distance. Both adapters use the same matcher; the page's request sequence ignores old results after rapid edits. List and map consume the same sorted array.
 
 ## Internal metrics
 
@@ -75,6 +59,6 @@ Presence heartbeats run only for visible pages with interaction within five minu
 
 ## Localization
 
-The seven locale catalogs are keyed by source string. Existing Spanish/Chinese/Arabic catalogs stay compatible; new catalogs override changed copy. Safe fallback is the source English string, and interpolation uses each locale's number formatter. Date/time/relative-time formatting uses Intl. Arabic sets document RTL. Self-hosted Source Sans 3 and Noto Arabic/Devanagari/Gujarati use OFL licenses; system CJK stacks cover Chinese. Font files, upstream URLs, hashes and licenses are in `public/fonts/`; optional font display and primary preload avoid late font swaps. No runtime font-provider request is sent. Native labels are used in interface-language selection; clinic filter values remain stable English machine values.
+The seven locale catalogs are keyed by source string. Existing Spanish/Chinese/Arabic catalogs stay compatible; new catalogs override changed copy. Safe fallback is the source English string, and interpolation uses each locale's number formatter. Date/time/relative-time formatting uses Intl. Arabic sets document RTL. System font stacks cover Arabic, Devanagari and Gujarati without sending requests to an external font provider. Native labels are used in interface-language selection; clinic filter values remain stable English machine values.
 
 Translations are working drafts, not professional translations. Native-speaker review is outstanding for all seven-language flows, especially health/consent/deletion language and long layouts. Directory proper names, fictional review prose, administrator-entered notes and audit payloads retain their source language. Seeded launch-checklist titles, reasons, actions and verification instructions are translated. They are not silently described as professionally localized clinical content.

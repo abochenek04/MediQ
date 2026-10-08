@@ -13,13 +13,13 @@ type TranslationKey =
 
 const translations: Record<string, Record<TranslationKey, string>> = {
   en: {
-    findCare: 'Find Care',
+    findCare: 'Find care',
     saved: 'Appointments',
-    reportWait: 'Report a Wait',
+    reportWait: 'Report wait',
     howItWorks: 'About',
     language: 'Language',
     heroEyebrow: 'Care planning for real life',
-    heroTitle: 'Find care that fits your schedule',
+    heroTitle: 'Know before you go.',
     heroBody: 'Compare total visit times, understand confidence, and make a plan that respects your day.',
     searchPlaceholder: 'Clinic, provider, specialty, or symptom',
   },

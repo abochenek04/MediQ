@@ -1,12 +1,3 @@
-export const accessibilityKeys = ['wheelchair', 'parking', 'elevator', 'restroom', 'asl', 'languageServices', 'sensoryFriendly'] as const;
-export type AccessibilityKey = typeof accessibilityKeys[number];
-export type Availability = 'available' | 'unavailable' | 'unknown';
-export type ClinicAccessibility = Record<AccessibilityKey, Availability>;
-export interface EstimateProvenance {
-  calculatedAt: string | null; evidenceUpdatedAt: string | null; fictional: boolean;
-  sources: { kind: 'patient-reports' | 'clinic-data' | 'historical-patterns' | 'fictional-model'; count?: number }[];
-}
-
 export type VisitMode = 'scheduled' | 'walk-in' | 'urgent';
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 export type ClinicStatus = 'open' | 'closed';
@@ -26,7 +17,6 @@ export interface VisitStage {
 }
 
 export interface LiveWaitEstimate {
-  provenance?: EstimateProvenance;
   evidenceState?: 'ready' | 'insufficient' | 'stale';
   reliability?: ReliabilityScore;
   mode: VisitMode;
@@ -60,12 +50,11 @@ export interface ReliabilityScore {
 }
 
 export interface PatientReport {
-  // null means the visit type was unknown; it is excluded from mode-specific estimation.
   moderationStatus?: 'accepted' | 'review' | 'rejected';
   id: string;
   clinicId: string;
   submittedAt: string;
-  visitMode: VisitMode | null;
+  visitMode: VisitMode;
   totalMinutes: number;
   source: DataSourceType;
   anonymous: boolean;
@@ -122,8 +111,6 @@ export interface SearchOrigin {
 }
 
 export interface Clinic {
-  accessibility?: ClinicAccessibility;
-  fictional?: boolean;
   id: string;
   name: string;
   type: string;
@@ -156,8 +143,6 @@ export interface Clinic {
 }
 
 export interface SearchFilters {
-  accessibility?: AccessibilityKey[];
-  location?: string;
   query: string;
   insurance: string;
   specialty: string;
@@ -181,23 +166,19 @@ export interface SavedAppointment {
 
 export interface WaitReportDraft {
   timezoneOffsetMinutes?: number;
-  crossesMidnight?: boolean;
-  insurance?: string | null;
-  language?: string | null;
-  providerId?: string | null;
   reportKind?: 'completed-visit' | 'current-wait';
   elapsedMinutes?: number;
   clinicId: string;
-  visitMode: VisitMode | null;
+  visitMode: VisitMode;
   visitDate: string;
-  arrivalTime: string | null;
-  checkInTime: string | null;
-  providerTime: string | null;
-  departureTime: string | null;
+  arrivalTime: string;
+  checkInTime: string;
+  providerTime: string;
+  departureTime: string;
   totalRange: string;
-  accuracy: '' | 'shorter' | 'about-right' | 'longer' | null;
-  communication: number | null;
-  rushed: '' | 'yes' | 'no' | null;
+  accuracy: '' | 'shorter' | 'about-right' | 'longer';
+  communication: number;
+  rushed: '' | 'yes' | 'no';
   note: string;
   anonymous: boolean;
 }

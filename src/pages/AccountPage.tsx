@@ -25,7 +25,7 @@ export function AccountPage({mode}:{mode:'signup'|'login'|'verify'|'reset'}){
   }else if(mode==='login'){
    await authRequest('/sign-in/email',{email:normalized,password});setPassword('');announceAccountChange();navigate('/find');
   }else if(mode==='verify'){
-   await authRequest('/email-otp/verify-email',{email:normalized,otp});setOtp('');announceAccountChange();navigate('/find');
+   await authRequest('/email-otp/verify-email',{email:normalized,otp});setMessage('Email verified. You can now sign in.');setOtp('');
   }else if(resetSent){
    await authRequest('/email-otp/reset-password',{email:normalized,otp,password});setPassword('');setOtp('');announceAccountChange();setMessage('Password reset. Sign in with your new password.');
   }else{

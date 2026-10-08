@@ -5,25 +5,22 @@ This upgrade preserves the React 19/Vite UI and `ClinicDataService`. The server 
 ## Architecture and operating limits
 
 - `server/migrations/001_initial.sql`: versioned relational schema, auth tables, private ownership foreign keys/cascades, shared clinic/provider/language/insurance/source records, reports, estimates/history, aggregate metrics, persistent rate limits, roles, checklist and audit records.
-- `server/migrations/002_healthcare_service.sql`: drops gender, retains canonical measurements and existing reports, marks old accounts’ tours complete, adds seven tri-state accessibility attributes and durable accessibility feedback.
 - `server/application.ts`: request origin checks, owner checks, verified-session checks, report validation and administration authorization. SQL uses bound parameters. Browsers have **no direct database access**. A supplied user ID cannot change ownership; private paths use the authenticated user's ID. `X-MediQ-Account` additionally rejects requests started under another account.
-- `server/auth.ts`: Better Auth, hashed 6-digit codes (10-minute validity, 5 attempts), email delivery. Send requests have a 60-second cooldown; sender limits apply even when auth triggers email indirectly. Limits survive server restarts. Signup stays pending until verification; successful verification creates the session automatically and claims the new-account tour. Returning login does not replay it.
+- `server/auth.ts`: Better Auth, hashed 6-digit codes (10-minute validity, 5 attempts), email delivery. Send requests have a 60-second cooldown; sender limits apply even when auth triggers email indirectly. Limits survive server restarts. Signup, verification and login are separate stages.
 - `src/context/AppContext.tsx`: session restoration before rendering, identity generation guards, cross-tab invalidation, 30-second session revalidation, temporary guest state. Auth cookies last up to 30 days, are HttpOnly/SameSite=Lax, Secure on HTTPS, database-backed and revocable. The provider renews eligible sessions daily. No cookie-cache shortcut bypasses revocation.
 - `server/jobs.ts`: recalculation, retention and authorized directory refresh. Retries three times with backoff; job runs record success/failure/unconfigured. `RUN_JOBS=true` runs every 5 minutes inside the API process without overlap. Alternatively, schedule `npm run jobs` on the **same machine and disk**. Never run both schedulers intentionally.
-- `server/integrations.ts`: server-only authorized adapter registry for directory, ratings, travel, booking availability and consent-checked future notifications. There are no credentials or licensed sources in this checkout, so these return explicit `unavailable`. No actual booking or notification is implemented or claimed. Travel inputs remain manual; maps/distances remain illustrative/straight-line. The original general contact form remains an explicitly labeled unsent demo. The separate accessibility-issue form persists messages and exposes them only to development/staging administrators; it does not send email.
+- `server/integrations.ts`: server-only authorized adapter registry for directory, ratings, travel, booking availability and consent-checked future notifications. There are no credentials or licensed sources in this checkout, so these return explicit `unavailable`. No actual booking or notification is implemented or claimed. Travel inputs remain manual; maps/distances remain illustrative/straight-line. Contact remains an explicitly labeled unsent demo.
 
 SQLite on a persistent cloud disk is a real durable relational backend, not an in-memory stub. It is deliberately a **single-instance** architecture: no shared network filesystem, multiple API replicas, serverless ephemeral disk or horizontal scaling. This is suitable for a small pilot. A managed PostgreSQL migration and a separate private production operations deployment are future scaling/operations work, not claimed here. Production serves no admin routes; staging tools operate on staging records. A trusted server operator can inspect/repair production through a controlled database maintenance procedure, with a backup and separately recorded change log. Before operating a real multi-clinic production service, establish its private moderation/operations access path.
 
 ## Exact local startup
 
-Use Node **24 LTS** (Node 22.16+ on the 22.x line or Node 23.8+ has the required backup API; older supported runtimes may print an experimental SQLite warning). From the repository root:
-
-The non-overwriting copy steps are for a fresh clone; retain already configured environment files. For an existing database, stop the old API and run `npm run db:backup -- /private/tmp/mediq-before-healthcare-upgrade.sqlite` before migration/startup. Use a new filename for each snapshot.
+Use Node **24 LTS** (Node >=22.13 works; older supported runtimes may print an experimental SQLite warning). From the repository root:
 
 ```sh
 npm ci
-cp -n .env.example .env
-cp -n server/.env.example server/.env
+cp .env.example .env
+cp server/.env.example server/.env
 npm run db:migrate
 npm run db:seed
 npm run api
@@ -43,8 +40,8 @@ For a standalone frontend demonstration, set `VITE_DATA_MODE=demo` and restart V
 
 1. Open `/signup`; provide first name, last name, email and a password of 12–128 characters. Optional profile fields are not collected here.
 2. Local development writes verification messages to **`.data/development/mail/*.json`**, mode 0600 inside a private directory. Open the newest file for your test email and enter its six-digit `otp` at `/verify`. This is a local mailbox transport, **not delivered email**. It is forbidden for staging/production. Local message files expire via the retention job after an hour.
-3. Verification signs in automatically and opens the tour once. Dismiss or complete it, then save a clinic/visit, reload, sign out and sign back in. Use another browser to verify persistence. Test a wrong/expired code and reset at `/reset-password`.
-4. From the trusted server terminal, run `npm run admin:grant -- your-verified-test-email@example.com`. This CLI requires an already verified identity, grants a role in a separate server table, and never accepts role input from the browser. The local/staging “Hello” account menu then shows Administration after refresh. Regular accounts and guests remain denied by the API. There is no default admin/test password.
+3. Sign in at `/login`; save a clinic/visit, reload, sign out and sign back in. Use another browser to verify persistence. Test a wrong/expired code and reset at `/reset-password`.
+4. From the trusted server terminal, run `npm run admin:grant -- your-verified-test-email@example.com`. This CLI requires an already verified identity, grants a role in a separate server table, and never accepts role input from the browser. Local/staging top navigation then shows Administration after refresh. Regular accounts and guests remain denied by the API. There is no default admin/test password.
 5. Use `/settings` to edit/clear optional profile values, change password or delete the account with password confirmation and the literal `DELETE`. No email editing is offered, avoiding an unverified-email replacement path.
 6. Run `npm run jobs`, then inspect Activity. Refresh cadence for account directory, checklist, metrics and review lists is 30 seconds. New/updated accounts and deletions appear within that bound or on Refresh.
 
@@ -69,25 +66,17 @@ Browser examples: `.env.staging.example`, `.env.production.example`. Server exam
 
 ## Release, health, backup, rollback
 
-Release path: local branch → complete tests → deploy the specific commit to staging → owner validates email/integrations and backs up → deliberate production promotion. Keep the existing public release online until the new service passes staging acceptance. Existing client routes remain compatible. This release explicitly requests a destructive gender-column removal. Migration 002 is incompatible with the previous profile API: stop writes, take and restore-test the pre-migration backup, then migrate. Never run the older server against schema 002. Canonical kg/cm and existing reports are preserved; only stored gender is removed. Migrations apply once transactionally; never rewrite an applied file after release.
+Release path: local branch → complete tests → deploy the specific commit to staging → owner validates email/integrations and backs up → deliberate production promotion. Keep the existing public release online until the new service passes staging acceptance. Existing client routes remain compatible. Avoid destructive migrations during a rollout: add nullable columns/new tables first, support both old/new forms, backfill, and remove old structures only in a later reviewed migration. Migrations apply once transactionally; never rewrite an applied file after release.
 
 `/api/health` checks the database and reports environment, email configuration and last job. This is liveness/basic readiness, **not proof of email delivery or external provider health**. Verify a real signup email, recovery, session restore, account isolation, report submission, and direct-route loading before promotion.
 
-Before migration or release: `npm run db:backup -- /private-backup-path/mediq-pre-release.sqlite`. This uses SQLite's online backup API with a read-only connection to the existing schema, producing a consistent snapshot including WAL content without applying pending migrations. Existing destinations and public/static paths are rejected. Do not copy just the active `.sqlite` file. Encrypt backups, send them off-host, restrict access, and test restoration into a **different** development/staging environment (use a sanitized database or deliberately change the environment marker offline only after understanding its contents). Never expose a backup under `dist/` or any web root.
+Before migration or release: `npm run db:backup -- /private-backup-path/mediq-pre-release.sqlite`. This uses SQLite's online backup API, producing a consistent snapshot including WAL content. Do not copy just the active `.sqlite` file. Encrypt backups, send them off-host, restrict access, and test restoration into a **different** development/staging environment (use a sanitized database or deliberately change the environment marker offline only after understanding its contents). Never expose a backup under `dist/` or any web root.
 
 Policy to configure before real data: encrypted daily backups retained for no more than 30 days, documented hosting/provider backup policies, deletion request reconciliation after restoration, and deletion of expired backups. This policy is a launch task, not a promise about a cloud account we cannot access. Render disk snapshots have provider retention and are not a substitute for verified SQLite backups. Do not claim immediate deletion from provider backups. Store any deletion reconciliation ledger encrypted, access-restricted and only as long as needed for recovery, outside analytics.
 
 Rollback: retain the prior application artifact/commit. For additive compatible migrations, redeploy the prior artifact against the current schema after a staging compatibility check. For an incompatible migration, stop writes, take a fresh backup, restore the last tested SQLite backup to a new disk/file, replay/reconcile post-backup activity and deletions as appropriate, then restart with the matching release. Clear/revoke restored sessions before admitting traffic. A restore loses changes since that snapshot; communicate this explicitly.
 
 A disk-backed Render service cannot run multiple instances or perform a zero-downtime instance swap. Its deploy restart entails a brief outage; free/ephemeral hosting is not suitable for this database. This implementation preserves the old public release during development but does **not** promise literal zero downtime on promotion. Higher availability requires a managed network database and additional deployment engineering before scaling.
-
-## Healthcare-service behavior
-
-New accounts store `pending → started → complete` tour state with an atomic owner-scoped start claim. A claimed but interrupted tour does not auto-replay on another device; manual replay remains available. Legacy accounts become complete without receiving a signup tour. Guests retain the original temporary-session tour and now start with empty plans.
-
-Private settings show 1 lb increments (3–1432 lb), 1 inch increments (1 ft–9 ft 10 in), age 0–125 and optional sex. Existing metric values survive exactly until a selection is changed; an outlying legacy weight is shown as a retained, disabled choice. Changes use exact 0.45359237 kg/lb and 2.54 cm/in conversion factors. UI ranges remain within existing canonical API limits.
-
-Accessibility issues are saved by `POST /api/accessibility-feedback` (5–1000 characters; three attempts/hour per actor). Administrators use the Accessibility feedback tab. Messages contain no automatically attached account identity; submitted free text may nevertheless contain personal information. Review messages through controlled operations and establish a retention/response policy before real-data launch. No automatic deletion policy was introduced.
 
 ## Reproducible verification
 
@@ -102,8 +91,6 @@ npm run test:browser
 `test:backend` creates new temporary databases and exercises the actual Better Auth handler and owner-scoped API, not an in-memory account stub. Browser tests create fresh `.data/e2e` only, start the real API/Vite, and verify cookies and interactions using independent browser contexts. Never point these tests at a cloud database. Browser screenshots/traces and all test credentials are ignored artifacts. Test scripts are not included in public assets.
 
 ## Source documentation reviewed for this implementation
-
-The minimum runtime metadata was corrected because [Node’s SQLite online-backup API](https://nodejs.org/api/sqlite.html#sqlitebackupsource-db-path-options) starts at 22.16 / 23.8. Local tests used 23.11; Node 24 LTS is the recommended setup runtime.
 
 - [Better Auth SQLite](https://better-auth.com/docs/adapters/sqlite), [email codes](https://better-auth.com/docs/plugins/email-otp), [sessions](https://better-auth.com/docs/concepts/session-management), [user/password operations](https://better-auth.com/docs/concepts/users-accounts).
 - [Resend send-email API](https://resend.com/docs/api-reference/emails/send-email).
